@@ -1,0 +1,32 @@
+{
+  "name": "namari",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit -p .",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "test": "npm run typecheck && npm run test:unit && npm run build && npm run test:e2e",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "serve:test": "wrangler dev --env test --port 8787 --ip 127.0.0.1",
+    "deploy": "vite build && wrangler deploy"
+  },
+  "dependencies": {
+    "@preact/signals": "^2.11.3",
+    "hono": "^4.13.13",
+    "jose": "^6.2.13",
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261019.1",
+    "@playwright/test": "1.56",
+    "@preact/preset-vite": "^2.10.6",
+    "typescript": "^7.0.2",
+    "vite": "^6.4.4",
+    "vitest": "^3.2.7",
+    "wrangler": "^4.151.2"
+  }
+}
