@@ -1,3 +1,5 @@
+import { cpSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 import preact from '@preact/preset-vite';
 
@@ -9,8 +11,18 @@ const staticShell = (): Plugin => ({
   transformIndexHtml: (html) => (STATIC ? html.replace('<span class="avatar-btn" aria-hidden="true"></span>', '') : html),
 });
 
+/** 静的版: kuromoji の辞書を dict/ に配置（ブラウザ内で形態素解析するため） */
+const copyDict = (): Plugin => ({
+  name: 'namari-copy-dict',
+  apply: 'build',
+  writeBundle(opts) {
+    if (!STATIC) return;
+    cpSync(resolve('node_modules/kuromoji/dict'), resolve(opts.dir ?? 'dist-static', 'dict'), { recursive: true });
+  },
+});
+
 export default defineConfig({
-  plugins: [preact(), staticShell()],
+  plugins: [preact(), staticShell(), copyDict()],
   // 静的版はどのサブパス（GitHub Pages の /<repo>/ など）でも動くよう相対パスで出力
   base: STATIC ? './' : '/',
   build: {

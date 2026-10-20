@@ -2,6 +2,10 @@ import { signal, computed, batch } from '@preact/signals';
 import { DIALECT_MAP, DIALECTS } from '../shared/dialects';
 import { api, ApiError, type Phrase, type User } from './api';
 import { IS_STATIC } from './mode';
+import { isRuleSupported } from '../shared/engine';
+
+/** この版で選べる方言か（静的版は規則変換に対応した方言だけ） */
+export const isAvailable = (id: string) => !!DIALECT_MAP[id] && (!IS_STATIC || isRuleSupported(id));
 
 export const STATUS = [
   { label: '未着手', key: 'todo' },
@@ -45,9 +49,11 @@ export const query = signal('');
 export const searchOpen = signal(false);
 
 const savedDialect = store.get<string>('nm:dialect', 'osaka');
-export const dialectId = signal(DIALECT_MAP[savedDialect] ? savedDialect : 'osaka');
+export const dialectId = signal(isAvailable(savedDialect) ? savedDialect : 'osaka');
 export const dialect = computed(() => DIALECT_MAP[dialectId.value] ?? DIALECTS[0]);
-export const recentDialects = signal<string[]>(store.get('nm:recentDialects', ['osaka', 'hakata', 'tsugaru', 'kyoto']));
+export const recentDialects = signal<string[]>(
+  store.get<string[]>('nm:recentDialects', ['osaka', 'hakata', 'tsugaru', 'kyoto']).filter(isAvailable),
+);
 
 export const input = signal(store.get('nm:input', ''));
 export const output = signal('');
@@ -111,7 +117,7 @@ export function setInput(v: string) {
 }
 
 export function chooseDialect(id: string) {
-  if (!DIALECT_MAP[id]) return;
+  if (!isAvailable(id)) return;
   dialectId.value = id;
   store.set('nm:dialect', id);
   const r = [id, ...recentDialects.value.filter((x) => x !== id)].slice(0, 8);
@@ -151,7 +157,9 @@ export async function convert() {
         ? '混み合っています。少し待ってから再試行してください'
         : code === 'too_long'
           ? '500文字以内で入力してください'
-          : '変換できませんでした。再試行してください';
+          : code === 'dict'
+            ? '辞書を読み込めませんでした。通信状態を確認して再試行してください'
+            : '変換できませんでした。再試行してください';
   } finally {
     converting.value = false;
   }

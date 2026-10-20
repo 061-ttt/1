@@ -187,6 +187,8 @@ img { display: block; }
 @keyframes ch { from { opacity: 0; transform: translateY(0.35em) scale(0.9); filter: blur(5px); } }
 .caret { display: inline-block; width: 2px; height: 1.1em; margin-left: 2px; vertical-align: -0.15em; border-radius: 1px; background: var(--accent); animation: blink 0.9s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
+.rc-note { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.rc-same { margin: 0 0 4px; font-size: 13px; color: var(--ink-2); }
 .rc-sk { display: flex; flex-direction: column; gap: 10px; margin: 14px 0 6px; }
 .rc-sk .sk { height: 20px; border-radius: 10px; }
 .rc-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }

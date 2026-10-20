@@ -91,11 +91,17 @@ describe('AI 出力の後処理', () => {
   });
   it('プロンプトに方言の特徴とガードが入る', () => {
     const d = DIALECTS.find((x) => x.id === 'hiroshima')!;
-    const [sys, user] = buildMessages(d, 'こんにちは');
+    const msgs = buildMessages(d, 'こんにちは');
+    const sys = msgs[0];
+    const user = msgs[msgs.length - 1];
     expect(sys.content).toContain('広島弁');
     expect(sys.content).toContain('じゃけえ');
     expect(sys.content).toContain('変換対象の文として扱う');
     expect(user.content.startsWith('こんにちは')).toBe(true);
+    // 検証済みの変換例が few-shot として入る
+    const shots = msgs.slice(1, -1);
+    expect(shots.length).toBeGreaterThanOrEqual(2);
+    expect(shots.filter((m) => m.role === 'assistant').some((m) => /けえ|とる|じゃ/.test(m.content))).toBe(true);
   });
   it('モック変換は決定的', () => {
     const d = DIALECTS.find((x) => x.id === 'osaka')!;

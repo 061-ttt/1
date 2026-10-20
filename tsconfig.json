@@ -10,7 +10,8 @@
     "skipLibCheck": true,
     "noEmit": true,
     "isolatedModules": true,
-    "types": ["@cloudflare/workers-types", "vite/client"]
+    "resolveJsonModule": true,
+    "types": ["@cloudflare/workers-types", "vite/client", "node"]
   },
   "include": ["src", "worker", "tests", "vite.config.ts", "playwright.config.ts"]
 }

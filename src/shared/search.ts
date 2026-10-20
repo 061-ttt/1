@@ -89,13 +89,14 @@ function scoreKey(key: string, q: string): number {
   return 0;
 }
 
-export function searchDialects(query: string): DialectHit[] {
+export function searchDialects(query: string, allow: (id: string) => boolean = () => true): DialectHit[] {
   const raw = normalize(query);
-  if (!raw) return DIALECTS.map((dialect) => ({ dialect, score: 1 }));
+  if (!raw) return DIALECTS.filter((d) => allow(d.id)).map((dialect) => ({ dialect, score: 1 }));
   const variants = new Set([raw, raw.replace(SUFFIX, '') || raw]);
   if (/^[a-z]+$/.test(raw)) variants.add(romajiToKana(raw));
   const hits: DialectHit[] = [];
   for (const item of INDEX) {
+    if (!allow(item.dialect.id)) continue;
     let best = 0;
     for (const q of variants) {
       for (const k of item.keys) best = Math.max(best, scoreKey(k, q));

@@ -1,6 +1,7 @@
 import { DIALECT_MAP } from '../shared/dialects';
-import { ruleConvert } from '../shared/rules';
-import type { Phrase } from './api';
+import { dialectConvert, isRuleSupported } from '../shared/engine';
+import { ApiError, type Phrase } from './api';
+import { getTokenizer } from './tokenizer';
 
 /** 静的版：フレーズ帳を端末内（localStorage）に保存し、変換はルールで行う */
 const KEY = 'nm:localPhrases';
@@ -56,8 +57,15 @@ export const localApi = {
   },
   /** 変換結果を 2 文字ずつ流してストリーミング表示を再現する */
   async convert(text: string, dialect: string, onChunk: (s: string) => void, signal?: AbortSignal) {
-    if (!DIALECT_MAP[dialect]) throw new Error('invalid');
-    const chars = Array.from(ruleConvert(dialect, text));
+    if (!DIALECT_MAP[dialect] || !isRuleSupported(dialect)) throw new ApiError(400, 'unsupported');
+    let tokenize;
+    try {
+      tokenize = await getTokenizer();
+    } catch {
+      throw new ApiError(503, 'dict');
+    }
+    if (signal?.aborted) throw new DOMException('aborted', 'AbortError');
+    const chars = Array.from(dialectConvert(tokenize, dialect, text));
     for (let i = 0; i < chars.length; i += 2) {
       if (signal?.aborted) throw new DOMException('aborted', 'AbortError');
       onChunk(chars.slice(i, i + 2).join(''));

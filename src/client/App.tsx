@@ -22,6 +22,7 @@ import {
   sheetReason,
   output,
   outputDialect,
+  outputSource,
   phrases,
   phrasesLoaded,
   query,
@@ -39,7 +40,9 @@ import {
   transition,
   user,
   bookAvailable,
+  isAvailable,
 } from './state';
+import { dictState, getTokenizer } from './tokenizer';
 import { api } from './api';
 import { IS_STATIC } from './mode';
 import { SwipeCard } from './SwipeCard';
@@ -128,7 +131,7 @@ function AvatarButton() {
 function SearchPanel() {
   const q = query.value;
   const open = searchOpen.value || q.length > 0;
-  const hits = useMemo(() => (q ? searchDialects(q).slice(0, 12) : []), [q]);
+  const hits = useMemo(() => (q ? searchDialects(q, isAvailable).slice(0, 12) : []), [q]);
   const nq = normalize(q);
   const phraseHits = useMemo(
     () => (nq ? phrases.value.filter((p) => normalize(p.source + p.result).includes(nq)).slice(0, 5) : []),
@@ -166,10 +169,10 @@ function SearchPanel() {
                 ))}
               </div>
             </Section>
-            {REGIONS.map((r) => (
+            {REGIONS.filter((r) => DIALECTS.some((x) => x.region === r.name && isAvailable(x.id))).map((r) => (
               <Section key={r.name} title={r.name}>
                 <div class="chips wrap">
-                  {DIALECTS.filter((x) => x.region === r.name).map((x) => (
+                  {DIALECTS.filter((x) => x.region === r.name && isAvailable(x.id)).map((x) => (
                     <button key={x.id} class={`chip btn ${x.id === dialectId.value ? 'on' : ''}`} type="button" onClick={() => pick(x.id)} data-testid="dialect-chip">
                       {x.name}
                     </button>
@@ -239,6 +242,7 @@ function SearchPanel() {
                         chooseDialect(h.dialect);
                         setInput(h.source);
                         output.value = h.result;
+                        outputSource.value = h.source;
                         outputDialect.value = h.dialect;
                         tab.value = 'convert';
                       });
@@ -354,6 +358,7 @@ function Converter() {
           placeholder="共通語で入力"
           maxLength={MAX * 2}
           value={input.value}
+          onFocus={() => IS_STATIC && getTokenizer().catch(() => undefined)}
           onInput={(e) => setInput((e.target as HTMLTextAreaElement).value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -394,6 +399,9 @@ function Converter() {
           <div class="rc-head">
             <span class="badge strong">{outD?.name ?? d.name}</span>
             {converting.value && <span class="dots" aria-label="変換中"><i /><i /><i /></span>}
+            {converting.value && !output.value && dictState.value === 'loading' && (
+              <span class="rc-note" data-testid="dict-loading">辞書を読み込み中</span>
+            )}
           </div>
           {convertError.value ? (
             <div class="rc-error" role="alert" data-testid="convert-error">
@@ -403,7 +411,12 @@ function Converter() {
               </button>
             </div>
           ) : output.value ? (
-            <Streamed text={output.value} />
+            <>
+              <Streamed text={output.value} />
+              {!converting.value && output.value === outputSource.value && (
+                <p class="rc-same" data-testid="no-change">この文には変換できる表現が見つかりませんでした</p>
+              )}
+            </>
           ) : (
             <div class="rc-sk">
               <i class="sk" /><i class="sk" style={{ width: '70%' }} />
