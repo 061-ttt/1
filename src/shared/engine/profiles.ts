@@ -50,7 +50,7 @@ const BANSHU: Profile = { ...KANSAI, prog: ['とう', 'どう'], progPast: ['と
 
 const MIE: Profile = {
   cop: 'や', copYo: 'やに', copNe: 'やな', copKara: 'やで', kara: 'で', dakara: 'やで',
-  neg: 'hen', negSuru: 'せえへん',
+  neg: 'hen', negSuru: 'せえへん', hen1: 'やへん',
   prog: ['とる', 'どる'], progNeg: ['とらへん', 'どらへん'], progPast: ['とった', 'どった'],
   yo: 'に', ne: 'なあ', qNo: 'ん', guess: 'やろ', guessCop: 'やろ', tag: 'やん',
   ii: 'ええ', very: 'めっちゃ', hayaku: 'はよ', dame: 'あかん', tired: 'えらい', hontou: 'ほんま',
@@ -269,7 +269,7 @@ const HOKKAIDO: Profile = {
 };
 
 const TSUGARU: Profile = {
-  ...TOHOKU, copKara: 'だはんで', kara: 'はんで', dakara: 'んだはんで', kedo: 'ばって', very: 'たげ', dame: 'わがね', suteru: 'nageru',
+  ...TOHOKU, copKara: 'だはんで', kara: 'はんで', dakara: 'んだはんで', kedo: 'ばって', very: 'たげ', dame: 'まいね', suteru: 'nageru',
 };
 const NANBU: Profile = { ...TOHOKU, copKara: 'だすけ', kara: 'すけ', dakara: 'んだすけ', kedo: 'ども', dame: 'わがね' };
 const MORIOKA: Profile = { ...TOHOKU, ne: 'なはん' };
@@ -277,7 +277,7 @@ const AKITA: Profile = { ...TOHOKU, copKara: 'だすけ', kara: 'すけ', dakara
 const YAMAGATA: Profile = { ...TOHOKU, copYo: 'だず', copKara: 'だがら', kara: 'がら', kedo: 'ども' };
 const SENDAI: Profile = { ...TOHOKU, copYo: 'だっちゃ', very: 'いぎなり' };
 const FUKUSHIMA: Profile = {
-  ...TOHOKU, neg: 'nee', progNeg: ['てねえ', 'でねえ'], copYo: 'だばい', yo: 'ばい', copKara: 'だがら', kara: 'がら', tired: 'こわい',
+  ...TOHOKU, neg: 'nee', progNeg: ['てねえ', 'でねえ'], copKara: 'だがら', kara: 'がら', tired: 'こわい',
 };
 
 // ---------- 沖縄 ----------

@@ -65,6 +65,8 @@ export interface Profile {
   neg?: NegType;
   negSuru?: string;
   negKuru?: string;
+  /** 一音節の一段動詞の否定（見ない→見やへん）。未指定は京阪の 見いひん／寝えへん */
+  hen1?: string;
   /** 「ません」 */
   masen?: string;
 

@@ -55,6 +55,7 @@ function negForm(P: Profile, verb: Tok, stem: string): string | undefined {
   if (verb.ctype === 'サ変・スル') return P.negSuru ?? NEG_SURU[k];
   if (verb.ctype.startsWith('カ変')) return P.negKuru ?? NEG_KURU[k];
   if (verb.ctype === '一段' && k === 'hen' && moraCount(verb.read) === 1) {
+    if (P.hen1) return stem + P.hen1;
     const v = vowelOf(verb.read);
     return v === 'i' ? `${stem}いひん` : v === 'e' ? `${stem}えへん` : undefined;
   }
@@ -190,7 +191,13 @@ export function convertTokens(T: Tok[], P: Profile): string {
         }
         const ps = particleSeq(T, i + 1);
         if (ps?.seq === 'よね') emit(P.copYone ?? `${c}よね`, 'other');
-        else if (ps?.seq === 'よ') emit(P.copYo ?? `${c}よ`, 'other');
+        else if (ps?.seq === 'よ') {
+          // 「そうだよ、…」で「だよ」の方言形が「だから」と同形になる方言（じゃけえ・やき）は、
+          // 読点の前では接続詞と誤読されるため断定の形だけにする
+          const beforeComma = !isEnd(T[i + 2]);
+          const ambiguous = !!P.copYo && (P.copYo === P.copKara || P.copYo === P.dakara);
+          emit(beforeComma && ambiguous ? c : P.copYo ?? `${c}よ`, 'other');
+        }
         else if (ps?.seq === 'ね') emit(P.copNe ?? `${c}ね`, 'other');
         else if (isEnd(T[i + 1])) emit(P.copEnd ?? c, 'other');
         else emit(c, 'other');
@@ -552,7 +559,9 @@ export function convertTokens(T: Tok[], P: Profile): string {
     }
 
     // ---- 接続助詞 ----
-    if (isConj(t, 'から') && (ctx === 'plain') && P.kara) {
+    // 変換していない「〜ない」の後で から→で にすると、共通語の「〜ないで」と同形になり意味が変わる
+    const unconvertedNai = isNai(T[i - 1]) && out[out.length - 1] === 'ない' && P.kara === 'で';
+    if (isConj(t, 'から') && (ctx === 'plain') && P.kara && !unconvertedNai) {
       emit(P.kara, 'other');
       i++;
       continue;
