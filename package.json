@@ -9,10 +9,12 @@
     "typecheck": "tsc --noEmit -p .",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
-    "test": "npm run typecheck && npm run test:unit && npm run build && npm run test:e2e",
+    "test": "npm run typecheck && npm run test:unit && npm run build && npm run build:static && npm run test:e2e",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "serve:test": "wrangler dev --env test --port 8787 --ip 127.0.0.1",
-    "deploy": "vite build && wrangler deploy"
+    "deploy": "vite build && wrangler deploy",
+    "build:static": "VITE_STATIC=1 vite build",
+    "serve:static": "node scripts/static-server.mjs"
   },
   "dependencies": {
     "@preact/signals": "^2.11.3",

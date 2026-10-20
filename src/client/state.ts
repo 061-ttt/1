@@ -1,6 +1,7 @@
 import { signal, computed, batch } from '@preact/signals';
 import { DIALECT_MAP, DIALECTS } from '../shared/dialects';
 import { api, ApiError, type Phrase, type User } from './api';
+import { IS_STATIC } from './mode';
 
 export const STATUS = [
   { label: '未着手', key: 'todo' },
@@ -37,6 +38,8 @@ export interface HistoryItem {
 export const ready = signal(false);
 export const config = signal<{ googleClientId: string | null; testMode: boolean }>({ googleClientId: null, testMode: false });
 export const user = signal<User | null>(null);
+/** フレーズ帳が使えるか（静的版はログインなしで端末内に保存） */
+export const bookAvailable = computed(() => IS_STATIC || !!user.value);
 export const tab = signal<'convert' | 'book'>('convert');
 export const query = signal('');
 export const searchOpen = signal(false);
@@ -155,7 +158,7 @@ export async function convert() {
 }
 
 export async function loadPhrases() {
-  if (!user.value) return;
+  if (!bookAvailable.value) return;
   try {
     const { phrases: list } = await api.phrases();
     phrases.value = list;
@@ -165,7 +168,7 @@ export async function loadPhrases() {
 }
 
 export async function saveOutput() {
-  if (!user.value) {
+  if (!bookAvailable.value) {
     openAccount('保存するにはログインしてください');
     return;
   }
@@ -263,6 +266,6 @@ export async function boot() {
     config.value = cfg;
     user.value = me.user;
   });
-  if (me.user) await loadPhrases().catch(() => undefined);
+  if (me.user || IS_STATIC) await loadPhrases().catch(() => undefined);
   ready.value = true;
 }

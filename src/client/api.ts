@@ -1,3 +1,6 @@
+import { IS_STATIC } from './mode';
+import { localApi } from './localApi';
+
 export interface User {
   id: string;
   email: string;
@@ -34,7 +37,7 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export const api = {
+const serverApi = {
   config: () => req<{ googleClientId: string | null; testMode: boolean }>('/config'),
   me: () => req<{ user: User | null }>('/me'),
   login: (credential: string) => req<{ user: User }>('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) }),
@@ -97,3 +100,12 @@ export const api = {
     if (!finished) throw new ApiError(502, 'interrupted');
   },
 };
+
+export const api: typeof serverApi = IS_STATIC
+  ? {
+      ...serverApi,
+      config: async () => ({ googleClientId: null, testMode: false }),
+      me: async () => ({ user: null }),
+      ...localApi,
+    }
+  : serverApi;

@@ -38,8 +38,10 @@ import {
   toast,
   transition,
   user,
+  bookAvailable,
 } from './state';
 import { api } from './api';
+import { IS_STATIC } from './mode';
 import { SwipeCard } from './SwipeCard';
 import { animate, SPRING_BOUNCY } from './motion';
 import {
@@ -113,7 +115,7 @@ function AvatarButton() {
     host?.querySelector('span.avatar-btn')?.remove();
     setMounted(true);
   }, []);
-  if (!host || !mounted) return null;
+  if (!host || !mounted || IS_STATIC) return null;
   const u = user.value;
   return createPortal(
     <button class="avatar-btn glass btn" type="button" aria-label={u ? `アカウント（${u.name}）` : 'ログイン'} data-testid="avatar" onClick={() => openAccount()}>
@@ -482,7 +484,7 @@ function Segments() {
 }
 
 function PhraseBook() {
-  if (!user.value) {
+  if (!bookAvailable.value) {
     return (
       <div class="view" data-testid="view-book">
         <div class="locked glass" data-testid="book-locked">
@@ -548,7 +550,7 @@ function TabBar() {
         >
           {it.icon}
           <span>{it.label}</span>
-          {it.key === 'book' && user.value && counts.value[1] > 0 && <span class="tab-badge">{counts.value[1]}</span>}
+          {it.key === 'book' && bookAvailable.value && counts.value[1] > 0 && <span class="tab-badge">{counts.value[1]}</span>}
         </button>
       ))}
     </nav>

@@ -18,13 +18,26 @@ export default defineConfig({
     launchOptions: executablePath ? { executablePath, args: ['--no-sandbox', '--disable-dev-shm-usage'] } : {},
   },
   projects: [
-    { name: 'mobile', use: { ...devices['Pixel 7'], browserName: 'chromium', viewport: { width: 390, height: 844 } }, testIgnore: /desktop\.spec\.ts/ },
+    { name: 'mobile', use: { ...devices['Pixel 7'], browserName: 'chromium', viewport: { width: 390, height: 844 } }, testIgnore: /(desktop|static)\.spec\.ts/ },
+    {
+      name: 'static',
+      use: { ...devices['Pixel 7'], browserName: 'chromium', viewport: { width: 390, height: 844 }, baseURL: 'http://127.0.0.1:4173/namari/' },
+      testMatch: /static\.spec\.ts/,
+    },
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 860 } }, testMatch: /desktop\.spec\.ts/ },
   ],
-  webServer: {
-    command: 'npm run build && npx wrangler d1 migrations apply DB --local --env test && npm run serve:test',
-    url: 'http://127.0.0.1:8787/api/config',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: 'npm run build && npx wrangler d1 migrations apply DB --local --env test && npm run serve:test',
+      url: 'http://127.0.0.1:8787/api/config',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
+      command: 'npm run build:static && npm run serve:static',
+      url: 'http://127.0.0.1:4173/namari/',
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    },
+  ],
 });
