@@ -27,6 +27,8 @@ const vowelAppend = (stem: string, vowel: string, eRow: string, iRow: string) =>
   vowel === 'i' ? stem + iRow : stem + eRow;
 
 const CONJ = { pos: '接続詞' } as const;
+const CONJ_COMMA = { pos: '接続詞', beforeComma: true } as const;
+const ADJ = { adj: true } as const;
 const ADV = { pos: '副詞' } as const;
 const NEG = { needNeg: true } as const;
 
@@ -68,7 +70,7 @@ const KANSAI: Profile = {
     ['かまわない', 'かまへん'],
     ['ばか', 'あほ'],
     ['じゃあ', 'ほな', CONJ],
-    ['それで', 'ほんで', CONJ],
+    ['それで', 'ほんで', CONJ_COMMA],
   ],
   verbs: { 片付ける: 'なおす', 殴る: 'どつく', 転ぶ: 'こける|1' },
   adjs: { 面白い: 'おもろい', ずるい: 'こすい', くすぐったい: 'こそばい', 温かい: 'ぬくい', 暖かい: 'ぬくい' },
@@ -102,7 +104,7 @@ const KAWACHI: Profile = mix(KANSAI, {
 // 泉州弁: 疑問の「け」、「ほて」（それで）、「さっぷい」（寒い）、「つれ」（友達）
 const SENSHU: Profile = mix(KANSAI, {
   qKa: 'け',
-  phrases: [['それで', 'ほて', CONJ], ['友達', 'つれ']],
+  phrases: [['それで', 'ほて', CONJ_COMMA], ['友達', 'つれ']],
   adjs: { 寒い: 'さっぷい' },
 });
 
@@ -113,10 +115,10 @@ const MIE: Profile = {
   yo: 'に', ne: 'なあ', qNo: 'ん', guess: 'やろ', guessCop: 'やろ', tag: 'やん', must: 'なあかん', uOnbin: true,
   ii: 'ええ', very: 'めっちゃ', hayaku: 'はよ', dame: 'あかん', tired: 'しんどい', hontou: 'ほんま', chigau: true,
   phrases: [
+    ['ありがとうございます', 'おおきに'],
     ['ありがとう', 'おおきに'],
-    ['大丈夫', 'だんない'],
+    ['大丈夫', 'だんない', ADJ],
     ['かまわない', 'かまへん'],
-    ['困った', 'かなん'],
     ['できない', 'できやん'],
     ['自転車', 'けった'],
     ['たくさん', 'ようけ'],
@@ -240,7 +242,7 @@ const IYO: Profile = mix(SHIKOKU, {
 const TOSA: Profile = mix(SHIKOKU, {
   cop: 'や', copYo: 'やき', copNe: 'やね', copKara: 'やき', kara: 'き', dakara: 'やき', kedo: 'けんど',
   prog: ['ちゅう', 'じゅう'], progNeg: undefined, progPast: ['ちょった', 'じょった'],
-  yo: 'ぜ', qNo: 'が', guess: 'ろう', guessCop: 'やろう', tag: 'やいか',
+  yo: 'ぜ', qNo: 'が', guess: 'ろう', guessCop: 'やろう', tag: 'やいか', noda: 'が', nodaEnd: 'やき',
   ii: 'えい', dame: 'いかん', hontou: undefined, hontouni: 'まっこと',
   phrases: [
     ['まじで', 'まっこと'],
@@ -267,9 +269,9 @@ const KYUSHU_WORDS: Phrase[] = [
   ['仕方ない', 'しょんなか'],
   ['しょうがない', 'しょんなか'],
 ];
-// カ語尾を使わない豊日方言（北九州・大分・宮崎）
+// カ語尾を使わない豊日方言（北九州・大分・宮崎）。こげん系（肥筑方言）は使わない
 const HOUNICHI_WORDS: Phrase[] = [
-  ...KYUSHU_BASE_WORDS,
+  ['全然', 'いっちょん', NEG],
   ['仕方がない', 'しょんない'],
   ['仕方ない', 'しょんない'],
   ['しょうがない', 'しょんない'],
@@ -353,7 +355,14 @@ const OITA: Profile = {
   iru: 'おる', iruNeg: 'おらん', iruPast: 'おった',
   yo: 'っちゃ', qNo: 'ん', guess: 'じゃろ', guessCop: 'じゃろ', uOnbin: true,
   very: 'しんけん', hayaku: 'はよ', dame: 'いけん', bother: 'よだきい', tired: 'きちい', noisy: 'せからしい',
-  phrases: [...HOUNICHI_WORDS, ['腹が減った', 'ひだりい']],
+  phrases: [
+    ...HOUNICHI_WORDS,
+    ['腹が減った', 'ひだりい'],
+    ['こんなに', 'こげえ'],
+    ['そんなに', 'そげえ'],
+    ['あんなに', 'あげえ'],
+    ['どう', 'どげえ', ADV],
+  ],
   verbs: { ...KYUSHU_VERBS, 捨てる: 'ほかる', 急ぐ: 'せく' },
   adjs: { 怖い: 'おじい', 汚い: 'いびしい' },
 };
@@ -472,6 +481,7 @@ const TOYAMA: Profile = mix(HOKURIKU, {
   copYo: 'やちゃ', copKara: 'やさかい', kara: 'さかい', dakara: 'ほやさかい', yo: 'ちゃ', qKa: 'け',
   phrases: [
     ['たくさん', 'でかいと'],
+    ['ありがとうございます', 'きのどくな'],
     ['ありがとう', 'きのどくな'],
     ['いいえ', 'なーん'],
   ],
@@ -483,17 +493,18 @@ const KANAZAWA: Profile = mix(HOKURIKU, {
   copYo: 'やぞ', copKara: 'やさけ', kara: 'さけ', dakara: 'ほやさけ', tag: 'がいね', very: 'がんこ', qNo: 'がん',
   noda: 'げん', nodaEnd: '', uOnbin: true,
   nasai: (stem) => `${stem}まっし`,
-  phrases: [['ありがとう', 'あんやと']],
+  phrases: [['ありがとうございます', 'あんやと'], ['ありがとう', 'あんやと']],
   verbs: { 傾く: 'かたがる' },
   adjs: { もどかしい: 'はがいしい', しつこい: 'いじくらしい', うっとうしい: 'いじくらしい' },
 });
 
 const FUKUI: Profile = mix(HOKURIKU, {
-  copYo: 'やざ', copNe: 'やのー', copKara: 'やで', kara: 'で', dakara: 'ほやで', yo: 'ざ', ne: 'のー', dame: 'あかん',
+  copYo: 'やざ', copNe: 'やのー', copKara: 'やで', kara: 'で', dakara: 'ほやで', yo: 'ざ', ne: 'のー', dame: 'あかん', qNo: undefined,
   prog: undefined, progNeg: ['てえん', 'でえん'], progPast: undefined, iru: undefined, iruNeg: 'えん', iruPast: undefined,
   shimauPast: ['てしもた', 'でしもた'], uOnbin: true, very: 'ひっで',
   phrases: [
-    ['大丈夫', 'だんねえ'],
+    ['大丈夫', 'だんねえ', ADJ],
+    ['ありがとうございます', 'きのどくな'],
     ['ありがとう', 'きのどくな'],
     ['少し', 'ちょっこし'],
     ['たくさん', 'ようけ'],
@@ -539,9 +550,8 @@ const IBARAKI: Profile = mix(KANTO, {
   must: 'なきゃなんねえ',
   phrases: [
     ['でたらめ', 'ごじゃっぺ'],
-    ['いい加減', 'ごじゃっぺ'],
     ['どうして', 'なして'],
-    ['それで', 'ほんで', CONJ],
+    ['それで', 'ほんで', CONJ_COMMA],
     ['大丈夫', 'だいじ'],
   ],
   verbs: { 捨てる: 'かっぽる', 壊す: 'ぶっかす', 殴る: 'ぶっくらす', 見つける: 'めっける|1', 降りる: 'おじる|1' },
@@ -554,7 +564,7 @@ const TOCHIGI: Profile = mix(KANTO, {
   adjs: { 怖い: 'おっかない' },
 });
 const GUNMA: Profile = mix(KANTO, {
-  guessCop: 'だんべえ', copYone: 'だんべえ', vol: 'be', be: 'べえ', copKara: 'けい', kara: 'けい',
+  guessCop: 'だんべえ', copYone: 'だんべえ', vol: 'be', be: 'べえ', copKara: 'だけい', kara: 'けい',
   phrases: [
     ['少し', 'ちっとんべえ'],
     ['もっと', 'まっと'],
@@ -579,7 +589,7 @@ const HOKKAIDO: Profile = {
 
 const TSUGARU: Profile = mix(TOHOKU, {
   copKara: 'だはんで', kara: 'はんで', dakara: 'んだはんで', kedo: 'ばって', very: 'たげ', dame: 'まいね', suteru: 'nageru',
-  must: 'ねばまいね',
+  must: 'ねばまいね', mustSuru: 'さ',
   phrases: [
     ['友達', 'けやぐ'],
     ['子供', 'わらし'],
@@ -609,7 +619,7 @@ const AIZU: Profile = mix(TOHOKU, {
   copNe: 'だなし', desuNe: ['なし', 'だなし'], very: 'ねっか',
   phrases: [
     ['そうですね', 'んだなし'],
-    ['大丈夫', 'さすけね'],
+    ['大丈夫', 'さすけね', ADJ],
   ],
   verbs: { 走る: 'とぶ' },
   adjs: { かわいい: 'めごい', もったいない: 'いだましい' },
@@ -621,6 +631,7 @@ const UCHINAA: Profile = { copYo: 'さー', yo: 'さー', very: 'でーじ', nod
 // ==================== キャラ口調 ====================
 const OJOUSAMA: Profile = {
   cop: 'です', copEnd: 'ですわ', copYo: 'ですわよ', copNe: 'ですわね', copYone: 'ですわよね', copPast: 'でしたわ',
+  copNeg: 'ではありませんわ', copNegFixed: true,
   desu: 'ですわ', masu: 'ますわ', plainEnd: 'わ', yo: 'わよ', ne: 'わね', yone: 'わよね', very: 'とっても',
   phrases: [
     ['ありがとうございます', 'ありがとう存じます'],
@@ -631,6 +642,7 @@ const OJOUSAMA: Profile = {
 
 const BUSHI: Profile = {
   cop: 'でござる', copYo: 'でござる', copNe: 'でござるな', copPast: 'でござった', copKara: 'ゆえ', kara: 'ゆえ', dakara: 'ゆえに',
+  copNeg: 'ではござらぬ', copNegFixed: true,
   neg: 'nu', masen: 'ませぬ', prog: ['ておる', 'でおる'], progNeg: ['ておらぬ', 'でおらぬ'], progPast: ['ておった', 'でおった'],
   iru: 'おる', iruNeg: 'おらぬ', iruPast: 'おった', must: 'ねばならぬ',
   desu: 'でござる', masu: 'まする', yo: 'ぞ', plainEnd: 'でござる', guess: 'であろう', guessCop: 'であろう', very: 'たいそう',
@@ -645,6 +657,7 @@ const BUSHI: Profile = {
 
 const OIRAN: Profile = {
   cop: 'でありんす', copPast: 'でありんした', desu: 'でありんす', masu: 'んす', masen: 'んせん',
+  copNeg: 'ではありんせん', copNegFixed: true,
   phrases: [
     ['ありがとうございます', 'ありがとうござりんす'],
     ['私', 'わっち'],

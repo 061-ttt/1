@@ -19,7 +19,9 @@ export interface Tok {
 export type Tokenize = (text: string) => Tok[];
 
 /** 句の置換: [共通語, 方言, 条件] */
-export type Phrase = [string, string] | [string, string, { pos?: string; needNeg?: true }];
+export type Phrase =
+  | [string, string]
+  | [string, string, { pos?: string; needNeg?: true; adj?: true; beforeComma?: true }];
 
 /** 否定の型 */
 export type NegType =
@@ -189,6 +191,8 @@ export interface Profile {
   qKa?: string;
   /** 名詞の否定「〜じゃない」全体の置き換え（ちゃう） */
   copNeg?: string;
+  /** copNeg の後の終助詞を変換しない（キャラ口調の「ではありませんわ」等） */
+  copNegFixed?: true;
   /** 否定の過去（ん型）の語尾。既定「かった」（長崎「じゃった」） */
   negPastTail?: string;
 

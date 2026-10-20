@@ -183,9 +183,18 @@ export function convertTokens(T: Tok[], P: Profile): string {
       while (j < T.length && acc.length < from.length) acc += T[j++].s;
       if (acc === from || toHira(acc) === from) {
         if (opt?.needNeg && !hasNegAfter(T, j)) continue;
+        // 「それで、」のように読点が続くときだけ（「それでいい」の「それで」は変えない）
+        if (opt?.beforeComma && !(T[j]?.pos === '記号' && T[j].s === '、')) continue;
+        // 「ありがとう」＋「ございます」のように、より長い丁寧表現の途中では置き換えない
+        if (T[j]?.base === 'ござる') continue;
         // 置換後の語の品詞で文脈を決める（動詞・形容詞で終わる句は述語扱い）
         const last = T[j - 1];
-        const pred = last.pos === '動詞' || last.pos === '形容詞' || isNai(last) || isTa(last);
+        let pred = last.pos === '動詞' || last.pos === '形容詞' || isNai(last) || isTa(last);
+        if (opt?.adj) {
+          // 形容詞のように使う語（さすけね・だんない）：後ろの断定「だ」は付けない
+          pred = true;
+          if (isCop(T[j]) && T[j].cform === '基本形') j++;
+        }
         emit(to, pred ? 'plain' : 'other', pred);
         i = j;
         matched = true;
@@ -231,7 +240,7 @@ export function convertTokens(T: Tok[], P: Profile): string {
     // ---- 「(行く)んだ」→ 博多「と」 ----
     if (
       P.noda && t.pos === '名詞' && t.p1 === '非自立' && (t.s === 'ん' || t.s === 'の') &&
-      isCop(T[i + 1]) && T[i + 1].cform === '基本形' && ctx === 'plain'
+      isCop(T[i + 1]) && T[i + 1].cform === '基本形' && (ctx === 'plain' || (isCop(T[i - 1]) && T[i - 1].cform === '体言接続'))
     ) {
       const ps = particleSeq(T, i + 2);
       if (isEnd(T[i + 2]) || ps?.seq === 'よ') {
@@ -307,7 +316,7 @@ export function convertTokens(T: Tok[], P: Profile): string {
       const isJa = t.s === 'じゃ' && (t.pos === '接続詞' || t.pos === '助詞') && T[i + 1]?.base === 'ない' && T[i + 1].cform === '基本形';
       const isDewa = isDewaNai(T, i);
       if (isJa || isDewa) {
-        emit(P.copNeg, 'plain', true);
+        emit(P.copNeg, P.copNegFixed ? 'other' : 'plain', !P.copNegFixed);
         i += isJa ? 2 : 3;
         continue;
       }
@@ -658,7 +667,7 @@ export function convertTokens(T: Tok[], P: Profile): string {
         const kaPos = isEnd(T[i + 1]) || (!!particleSeq(T, i + 1) && particleSeq(T, i + 1)?.seq !== 'よね') ||
           isConj(T[i + 1], 'から', 'けど', 'けれど', 'けれども') || (T[i + 1]?.pos === '名詞' && T[i + 1].p1 !== '非自立') ||
           (!!P.noda && T[i + 1]?.p1 === '非自立' && ['ん', 'の'].includes(T[i + 1].s) && isCop(T[i + 2]));
-        if (['いい', 'よい', '良い'].includes(t.base) && P.ii && (!P.adjKa || kaPos)) {
+        if (['いい', 'よい', '良い'].includes(t.base) && P.ii && (!P.adjKa || kaPos) && !(P.adjKa && T[i + 1]?.s === '加減')) {
           s = P.ii;
         } else if (['めんどくさい', '面倒くさい', 'めんどうくさい'].includes(t.base) && P.bother) {
           s = P.bother;
@@ -674,7 +683,10 @@ export function convertTokens(T: Tok[], P: Profile): string {
         }
         // 「いいじゃない」で確認の言い方を持たない方言は、形容詞も共通語のまま
         if (T[i + 1]?.s === 'じゃ' && T[i + 1].pos === '助詞' && isNai(T[i + 2]) && !P.tag) s = t.s;
-        if (P.adjKa && s.endsWith('い') && kaContext(T, i + 1)) s = `${s.slice(0, -1)}か`;
+        if (P.adjKa && s.endsWith('い') && kaContext(T, i + 1) && T[i + 1]?.s !== '加減') {
+          // かっこいい→かっこよか、気持ちいい→気持ちよか
+          s = s.endsWith('いい') && s.length > 2 ? `${s.slice(0, -2)}よか` : `${s.slice(0, -1)}か`;
+        }
         emit(s, 'plain', true);
         lastAdj = { at: out.length - 1, tok: t };
         i++;
@@ -742,7 +754,9 @@ export function convertTokens(T: Tok[], P: Profile): string {
         }
       }
       if (t.s === 'の' && isQuestionMark(T[i + 1]) && P.qNo && (ctx === 'plain' || ctx === 'other')) {
-        emit(P.qNo, 'other');
+        // 「行かへん」「知らん」の後で「ん？」にすると「んん」と重なるので「の」のまま
+        const prevOut = out[out.length - 1] ?? '';
+        emit(P.qNo.startsWith('ん') && prevOut.endsWith('ん') ? 'の' : P.qNo, 'other');
         i++;
         continue;
       }
