@@ -7,7 +7,7 @@ export const dictState = signal<'idle' | 'loading' | 'ready' | 'error'>('idle');
 let pending: Promise<Tokenize> | null = null;
 
 /** kuromoji を遅延読み込みする（約 18MB の辞書。初回のみ） */
-export function getTokenizer(): Promise<Tokenize> {
+export function getTokenizer(dicPath = 'dict/'): Promise<Tokenize> {
   if (pending) return pending;
   dictState.value = 'loading';
   pending = import('kuromoji/build/kuromoji.js')
@@ -15,7 +15,7 @@ export function getTokenizer(): Promise<Tokenize> {
       const kuromoji = ((mod as { default?: unknown }).default ?? mod) as typeof import('kuromoji');
       return new Promise<Tokenize>((resolve, reject) => {
         // kuromoji は内部で path.join を使うため、ページからの相対パスで渡す
-        kuromoji.builder({ dicPath: 'dict/' }).build((err, t) => {
+        kuromoji.builder({ dicPath }).build((err, t) => {
           if (err || !t) reject(err ?? new Error('dict'));
           else resolve((s: string) => t.tokenize(s).map(fromKuromoji));
         });

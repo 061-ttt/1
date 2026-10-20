@@ -21,6 +21,8 @@ test('サブパス配下で起動し、JS 前の入力が引き継がれる・AP
   await expect(page.getByTestId('dialect-hit').first()).toContainText('大阪弁');
   // ログインはないのでアバターは出さない
   await expect(page.getByTestId('avatar')).toHaveCount(0);
+  // 代わりに地図版への入口がある（HTML の時点から）
+  await expect(page.getByTestId('map-link')).toHaveAttribute('href', 'map/');
   expect(apiCalls).toEqual([]);
   void consoleErrors;
 });
@@ -105,5 +107,14 @@ test('ログインなしでフレーズ帳に保存し、フリックで管理�
   await page.getByTestId('tab-book').click();
   await expect(page.locator(`[data-id="${id}"]`)).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  void consoleErrors;
+});
+
+test('地図版への入口から地図版を開ける', async ({ page, consoleErrors }) => {
+  await page.goto('./');
+  await ready(page);
+  await page.getByRole('link', { name: '地図で見る' }).click();
+  await expect(page).toHaveURL(/\/namari\/map\/$/);
+  await expect(page.locator('#q')).toBeVisible();
   void consoleErrors;
 });

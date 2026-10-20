@@ -13,6 +13,8 @@ const TYPES = {
   '.svg': 'image/svg+xml',
   '.webmanifest': 'application/manifest+json',
   '.png': 'image/png',
+  '.woff2': 'font/woff2',
+  '.gz': 'application/gzip',
 };
 
 createServer(async (req, res) => {
@@ -30,7 +32,13 @@ createServer(async (req, res) => {
   if (!rel || rel === '.' || rel.endsWith('/')) rel += 'index.html';
   const file = join(ROOT, rel);
   try {
-    if (!(await stat(file)).isFile()) throw new Error('dir');
+    const st = await stat(file);
+    if (st.isDirectory()) {
+      // GitHub Pages と同じく、末尾スラッシュなしのディレクトリはリダイレクト
+      res.writeHead(301, { Location: url.pathname + '/' + url.search }).end();
+      return;
+    }
+    if (!st.isFile()) throw new Error('not a file');
     res.writeHead(200, { 'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream' });
     res.end(await readFile(file));
   } catch {

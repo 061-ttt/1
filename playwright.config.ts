@@ -18,11 +18,26 @@ export default defineConfig({
     launchOptions: executablePath ? { executablePath, args: ['--no-sandbox', '--disable-dev-shm-usage'] } : {},
   },
   projects: [
-    { name: 'mobile', use: { ...devices['Pixel 7'], browserName: 'chromium', viewport: { width: 390, height: 844 } }, testIgnore: /(desktop|static)\.spec\.ts/ },
+    { name: 'mobile', use: { ...devices['Pixel 7'], browserName: 'chromium', viewport: { width: 390, height: 844 } }, testIgnore: /(desktop|static|map)\.spec\.ts/ },
     {
       name: 'static',
       use: { ...devices['Pixel 7'], browserName: 'chromium', viewport: { width: 390, height: 844 }, baseURL: 'http://127.0.0.1:4173/namari/' },
       testMatch: /static\.spec\.ts/,
+    },
+    {
+      // 地図版は WebGL を使う。GPU のない環境でもソフトウェア描画（SwiftShader）で動かす
+      name: 'map',
+      use: {
+        ...devices['Pixel 7'],
+        browserName: 'chromium',
+        viewport: { width: 390, height: 844 },
+        baseURL: 'http://127.0.0.1:4173/namari/',
+        launchOptions: {
+          ...(executablePath ? { executablePath } : {}),
+          args: ['--no-sandbox', '--disable-dev-shm-usage', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+        },
+      },
+      testMatch: /map\.spec\.ts/,
     },
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 860 } }, testMatch: /desktop\.spec\.ts/ },
   ],

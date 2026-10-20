@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-visual" />
+    <meta name="theme-color" content="#d3e6ea" />
+    <meta name="color-scheme" content="light" />
+    <meta name="description" content="共通語の文を、日本地図の上で各地の方言に一度に変換" />
+    <title>Namari 地図</title>
+    <link rel="icon" href="../icon.svg" type="image/svg+xml" />
+    <style>
+      /* JS 読み込み前に必要な最小スタイル（入力欄＋地図のスケルトン） */
+      :root {
+        --sea: #d3e6ea;
+        --sea-deep: #b9d5dc;
+        --ink: #1f2d36;
+        --ink-2: #4f6470;
+        --paper: #ffffff;
+        --edge: rgba(31, 45, 54, 0.14);
+        --font: 'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', 'Hiragino Sans', 'Noto Sans JP', 'Noto Sans CJK JP',
+          'Yu Gothic UI', 'Meiryo', system-ui, sans-serif;
+        --top-safe: env(safe-area-inset-top, 0px);
+        --bottom-safe: env(safe-area-inset-bottom, 0px);
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: var(--sea); color: var(--ink); font-family: var(--font); -webkit-text-size-adjust: 100%; }
+      body { overflow: hidden; overscroll-behavior: none; }
+      .bar {
+        position: fixed; z-index: 40; top: 0; left: 0; right: 0;
+        padding: calc(var(--top-safe) + 10px) 12px 0; display: flex; justify-content: center; pointer-events: none;
+      }
+      .field {
+        pointer-events: auto; position: relative; width: 100%; max-width: 520px; height: 52px;
+        background: var(--paper); border: 1px solid var(--edge); border-radius: 16px;
+        box-shadow: 0 2px 0 rgba(31, 45, 54, 0.1), 0 14px 30px -18px rgba(31, 45, 54, 0.45);
+        display: flex; align-items: center;
+      }
+      .field input {
+        width: 100%; height: 100%; border: 0; outline: 0; background: transparent; border-radius: 16px;
+        padding: 0 48px 0 18px; font: 500 17px/1 var(--font); color: var(--ink); -webkit-appearance: none; appearance: none;
+      }
+      .field input::placeholder { color: #7f919b; }
+      #boot {
+        position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: var(--sea);
+        padding: calc(var(--top-safe) + 120px) 24px calc(var(--bottom-safe) + 56px);
+        transition: opacity 0.5s ease;
+      }
+      #boot.leaving { opacity: 0; pointer-events: none; }
+      #boot svg { width: min(92vw, 560px); max-height: 100%; overflow: visible; }
+      #boot path { fill: #e9f1f2; animation: sil 1.4s ease-in-out infinite alternate; }
+      @media (max-aspect-ratio: 19/20) { #boot svg { transform: scaleY(0.82) rotate(-35deg); width: min(120vw, 560px); } }
+      @keyframes sil { from { fill: #e3eef0; } to { fill: #f6fafa; } }
+      @media (prefers-reduced-motion: reduce) { #boot path { animation: none; } }
+      .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    </style>
+  </head>
+  <body>
+    <header class="bar" id="bar">
+      <div class="field">
+        <label for="q" class="sr">共通語の文</label>
+        <input id="q" type="text" maxlength="200" placeholder="共通語の文を入力" autocomplete="off" autocapitalize="off"
+          spellcheck="false" enterkeyhint="done" autofocus />
+      </div>
+    </header>
+    <div id="boot" aria-hidden="true"><svg viewBox="0 0 438 516"><path d="__SILHOUETTE__" /></svg></div>
+    <script type="module" src="../src/map/entry.ts"></script>
+  </body>
+</html>
