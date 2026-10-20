@@ -18,6 +18,9 @@ export interface Tok {
 
 export type Tokenize = (text: string) => Tok[];
 
+/** 句の置換: [共通語, 方言, 条件] */
+export type Phrase = [string, string] | [string, string, { pos?: string; needNeg?: true }];
+
 /** 否定の型 */
 export type NegType =
   | 'n' // 行かん・食べん
@@ -84,7 +87,7 @@ export interface Profile {
   /** 「てください」→ て＋これ */
   kudasai?: string;
   /** 連用形＋「なさい」 */
-  nasai?: (stem: string, vowel: string) => string;
+  nasai?: (stem: string, vowel: string, ctype: string) => string;
 
   // --- 存在の「いる」 ---
   iru?: string;
@@ -120,6 +123,10 @@ export interface Profile {
   desuYo?: string;
   /** 「ますよ」 */
   masuYo?: string;
+  /** 「ですね」全体の置き換え [形容詞・動詞の後, 名詞の後]（会津「暑いなし」「雨だなし」） */
+  desuNe?: [string, string];
+  /** 意志・推量の「べ」の形（群馬「べえ」） */
+  be?: string;
   /** 丁寧形の後の「よ」「ね」 */
   pYo?: string;
   pNe?: string;
@@ -136,7 +143,7 @@ export interface Profile {
   /** 〜でしょう */
   guessPolite?: string;
   /** 意志「行こう」 */
-  vol?: 'drop' | 'be' | 'ppe' | 'mai';
+  vol?: 'drop' | 'be' | 'ppe' | 'mai' | 'maiA' | 'zaa';
 
   // --- 形容詞 ---
   /** 九州のカ語尾（暑か・よか） */
@@ -166,8 +173,24 @@ export interface Profile {
   hontou?: string;
   hontouni?: string;
   suteru?: 'nageru' | 'hokasu';
-  /** 表層の語・句の置換（トークン境界で一致したときだけ） */
-  phrases?: [string, string][];
+  /** 表層の語・句の置換（トークン境界で一致したときだけ。カタカナはひらがなと同一視） */
+  phrases?: Phrase[];
+  /** 動詞の語彙（基本形→方言の基本形）。活用は自動。一段動詞は末尾に「|1」 */
+  verbs?: Record<string, string>;
+  /** 形容詞の語彙（基本形→方言の基本形）。語幹を差し替えて活用。末尾が「か」のものは九州のカ語尾専用 */
+  adjs?: Record<string, string>;
+  /** ワ行五段の連用形のウ音便（買うた・言うた）。'kansai' は「言う→ゆう」 */
+  uOnbin?: true | 'kansai';
+  /** 「〜なければならない」系（未然形＋これ。する→せ、来る→こ） */
+  must?: string;
+  /** must の「する」の形（既定「せ」。関東「し」） */
+  mustSuru?: string;
+  /** 疑問の「か？」（平叙形の後） */
+  qKa?: string;
+  /** 名詞の否定「〜じゃない」全体の置き換え（ちゃう） */
+  copNeg?: string;
+  /** 否定の過去（ん型）の語尾。既定「かった」（長崎「じゃった」） */
+  negPastTail?: string;
 
   /** 最後に全体へかける整形（キャラ口調のみ） */
   post?: (s: string) => string;

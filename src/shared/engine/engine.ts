@@ -1,5 +1,6 @@
+import { conjugate, ctypeOf, parseVerb, voicedTe } from './conj';
 import { moraCount, shiftRow, toHira, vowelOf } from './kana';
-import type { NegType, Profile, Tok, Tokenize } from './types';
+import type { NegType, Phrase, Profile, Tok, Tokenize } from './types';
 
 /*
  * 形態素解析の結果（品詞・活用）に基づいて共通語を方言へ変換する。
@@ -34,6 +35,43 @@ function particleSeq(T: Tok[], j: number): { seq: 'よ' | 'ね' | 'よね'; len:
   return null;
 }
 
+/** 「て/た」系（連用形の後の接続助詞て・で、助動詞た・だ） */
+const isTeTa = (t?: Tok) =>
+  !!t && ((t.pos === '助詞' && t.p1 === '接続助詞' && (t.s === 'て' || t.s === 'で')) || isAux(t, '特殊・タ'));
+
+/** 九州のカ語尾にしてよい位置（文末・よ/ね・から/けど・名詞の前） */
+function kaContext(T: Tok[], j: number): boolean {
+  const n = T[j];
+  const ps = particleSeq(T, j);
+  return (
+    isEnd(n) || (!!ps && ps.seq !== 'よね') || isConj(n, 'から', 'けど', 'けれど', 'けれども') ||
+    (!!n && n.pos === '名詞' && n.p1 !== '非自立' && n.p1 !== '接尾')
+  );
+}
+
+/** 後ろに否定があるか（全然→いっちょん 等の条件） */
+function hasNegAfter(T: Tok[], j: number): boolean {
+  for (let k = j; k < T.length && !isEnd(T[k]); k++) {
+    if (isNai(T[k]) || T[k].base === 'ない' || (T[k].pos === '助動詞' && ['ん', 'ぬ'].includes(T[k].base))) return true;
+  }
+  return false;
+}
+
+/** 名詞の否定「〜ではない」（で＋は＋ない） */
+function isDewaNai(T: Tok[], i: number): boolean {
+  const t = T[i];
+  return (
+    !!t && t.s === 'で' && (isCop(t) || (t.pos === '助詞' && t.p1 === '格助詞')) && T[i + 1]?.s === 'は' &&
+    T[i + 2]?.base === 'ない' && T[i + 2].cform === '基本形' && safeAfterNeg(T, i + 3)
+  );
+}
+
+/** 「〜なければならない」系（未然形の後に続く表層） */
+const MUST_PATTERNS = [
+  'なければならない', 'なければいけない', 'なければだめだ', 'なきゃならない', 'なきゃいけない', 'なきゃだめだ',
+  'ないといけない', 'ないとだめだ', 'なくてはならない', 'なくてはいけない', 'なくちゃいけない', 'なくちゃならない',
+];
+
 /** 否定形に変えてよい後続か */
 function safeAfterNeg(T: Tok[], j: number): boolean {
   const t = T[j];
@@ -66,7 +104,7 @@ function negPastForm(P: Profile, verb: Tok, stem: string): string | undefined {
   if (P.neg === 'nee' || P.neg === 'nu') return undefined;
   const f = negForm(P, verb, stem);
   if (!f) return undefined;
-  return f + (P.neg === 'ne' ? 'がった' : 'かった');
+  return f + (P.neg === 'ne' ? 'がった' : P.negPastTail ?? 'かった');
 }
 
 /** 関東の連母音融合（すごい→すげえ、暑い→あちい） */
@@ -105,6 +143,7 @@ export function convertTokens(T: Tok[], P: Profile): string {
   let predEnd = false;
   /** 京都用: 直前に出力した形容詞 */
   let lastAdj = null as { at: number; tok: Tok } | null;
+  let voiceNext = null as 'te' | 'de' | null;
   const phrases = [...(P.phrases ?? [])].sort((a, b) => b[0].length - a[0].length);
 
   const emit = (s: string, c: Ctx, pred = false) => {
@@ -116,7 +155,16 @@ export function convertTokens(T: Tok[], P: Profile): string {
 
   let i = 0;
   while (i < T.length) {
-    const t = T[i];
+    let t = T[i];
+    // 方言の動詞に差し替えた直後の「て/た」の清濁を合わせる（ほかして・あさいだ）
+    if (voiceNext) {
+      if (isTeTa(t)) {
+        const head = voiceNext === 'de' ? { て: 'で', た: 'だ' } : { で: 'て', だ: 'た' };
+        const c0 = t.s[0] as keyof typeof head;
+        if (head[c0]) t = { ...t, s: head[c0] + t.s.slice(1) };
+      }
+      voiceNext = null;
+    }
 
     // ---- 文末記号 ----
     if (t.pos === '記号') {
@@ -128,18 +176,43 @@ export function convertTokens(T: Tok[], P: Profile): string {
 
     // ---- 句の置換（トークン境界で一致したときだけ） ----
     let matched = false;
-    for (const [from, to] of phrases) {
+    for (const [from, to, opt] of phrases as Phrase[]) {
+      if (opt?.pos && t.pos !== opt.pos) continue;
       let acc = '';
       let j = i;
       while (j < T.length && acc.length < from.length) acc += T[j++].s;
-      if (acc === from) {
-        emit(to, 'other');
+      if (acc === from || toHira(acc) === from) {
+        if (opt?.needNeg && !hasNegAfter(T, j)) continue;
+        // 置換後の語の品詞で文脈を決める（動詞・形容詞で終わる句は述語扱い）
+        const last = T[j - 1];
+        const pred = last.pos === '動詞' || last.pos === '形容詞' || isNai(last) || isTa(last);
+        emit(to, pred ? 'plain' : 'other', pred);
         i = j;
         matched = true;
         break;
       }
     }
     if (matched) continue;
+
+    // ---- 「〜なければならない」系 ----
+    if (P.must && isVerb(t) && t.p1 === '自立' && t.cform === '未然形') {
+      const rest = T.slice(i + 1, i + 6).map((x) => x.s);
+      let len = 0;
+      for (const pat of MUST_PATTERNS) {
+        let acc = '';
+        for (let k = 0; k < rest.length && acc.length < pat.length; k++) {
+          acc += rest[k];
+          if (acc === pat) len = k + 1;
+        }
+        if (len) break;
+      }
+      if (len) {
+        const stem = t.ctype === 'サ変・スル' ? P.mustSuru ?? 'せ' : t.ctype.startsWith('カ変') ? 'こ' : P.verbs?.[t.base] ? conjugate(parseVerb(P.verbs[t.base]), '未然形', false) ?? t.s : t.s;
+        emit(stem + P.must, 'plain', true);
+        i += 1 + len;
+        continue;
+      }
+    }
 
     // ---- 文頭の「だから」 ----
     if (t.pos === '接続詞' && t.s === 'だから' && P.dakara) {
@@ -149,7 +222,7 @@ export function convertTokens(T: Tok[], P: Profile): string {
     }
 
     // ---- 「そう」＋だ ----
-    if (t.s === 'そう' && t.pos === '副詞' && isCop(T[i + 1]) && P.sou && P.cop) {
+    if (t.s === 'そう' && t.pos === '副詞' && isCop(T[i + 1]) && T[i + 1].cform !== '体言接続' && P.sou) {
       emit(P.sou, 'noun');
       i++;
       continue;
@@ -229,6 +302,31 @@ export function convertTokens(T: Tok[], P: Profile): string {
       continue;
     }
 
+    // ---- 名詞の否定「〜じゃない」全体の置き換え（ちゃう） ----
+    if (P.copNeg && ctx !== 'plain') {
+      const isJa = t.s === 'じゃ' && (t.pos === '接続詞' || t.pos === '助詞') && T[i + 1]?.base === 'ない' && T[i + 1].cform === '基本形';
+      const isDewa = isDewaNai(T, i);
+      if (isJa || isDewa) {
+        emit(P.copNeg, 'plain', true);
+        i += isJa ? 2 : 3;
+        continue;
+      }
+    }
+
+    // ---- 「(名詞)ではない」→ や(じゃ)ない ----
+    if (isDewaNai(T, i) && ctx !== 'plain' && P.cop) {
+      emit(P.cop, 'other');
+      i += 2;
+      continue;
+    }
+
+    // ---- 関東・東北: 名詞の否定の「ない」→ ねえ（雨じゃねえ） ----
+    if (isNai(t) && t.cform === '基本形' && P.nai && (T[i - 1]?.s === 'じゃ' || (T[i - 1]?.s === 'は' && T[i - 2]?.s === 'で')) && ctx !== 'plain' && safeAfterNeg(T, i + 1)) {
+      emit(P.nai, 'plain', true);
+      i++;
+      continue;
+    }
+
     // ---- 「じゃない」 ----
     if (t.s === 'じゃ' && T[i + 1]?.base === 'ない') {
       // 動詞・形容詞の後の「じゃない」は確認（いいじゃない）
@@ -240,7 +338,7 @@ export function convertTokens(T: Tok[], P: Profile): string {
           i = j;
           continue;
         }
-      } else if (t.pos === '接続詞' && P.cop) {
+      } else if (ctx !== 'plain' && P.cop) {
         emit(P.cop, 'other');
         i++;
         continue;
@@ -261,6 +359,11 @@ export function convertTokens(T: Tok[], P: Profile): string {
             i += 1 + (ps?.len ?? 0);
             continue;
           }
+        }
+        if (ps?.seq === 'ね' && P.desuNe) {
+          emit(ctx === 'plain' ? P.desuNe[0] : P.desuNe[1], 'polite');
+          i += 2;
+          continue;
         }
         const base = endish && ctx !== 'plain' && P.desu ? P.desu : 'です';
         if (ps?.seq === 'よ') emit(base === 'です' && P.desuYo ? P.desuYo : base + (P.pYo ?? 'よ'), 'polite');
@@ -332,6 +435,27 @@ export function convertTokens(T: Tok[], P: Profile): string {
     if (isVerb(t) && t.p1 === '自立') {
       let stem = t.s;
       let verb = t;
+      const nextTeTa = isTeTa(T[i + 1]);
+      // 語彙（活用を合わせて差し替え）
+      const spec = P.verbs?.[t.base];
+      if (spec) {
+        const v = parseVerb(spec);
+        const f = conjugate(v, t.cform, nextTeTa);
+        if (f) {
+          stem = f;
+          verb = { ...t, ctype: ctypeOf(v), read: v.base };
+          if (nextTeTa && (t.cform === '連用形' || t.cform === '連用タ接続')) voiceNext = voicedTe(v) ? 'de' : 'te';
+        }
+      } else if (P.uOnbin && t.ctype === '五段・ワ行促音便' && t.cform === '連用タ接続' && nextTeTa) {
+        // 買った→こうた、言った→ゆうた（西日本のウ音便）
+        if (t.base === '言う') stem = P.uOnbin === 'kansai' ? 'ゆう' : 'いう';
+        else {
+          const r = toHira(t.read).replace(/っ$/, '');
+          const lastK = r.slice(-1);
+          const v = vowelOf(lastK);
+          stem = v === 'a' ? `${r.slice(0, -1)}${shiftRow(lastK, 'o')}う` : v === 'o' || v === 'u' ? `${r}う` : stem;
+        }
+      }
       // 語彙
       if (P.chigau && t.base === '違う') {
         if (t.cform === '基本形') stem = 'ちゃう';
@@ -402,9 +526,20 @@ export function convertTokens(T: Tok[], P: Profile): string {
           const base = t.ctype === 'サ変・スル' ? 'する' : t.base;
           let f: string;
           if (P.vol === 'drop') f = stem;
-          else if (P.vol === 'be') f = `${base}べ`;
+          else if (P.vol === 'be') f = base + (P.be ?? 'べ');
           else if (P.vol === 'ppe') f = t.ctype === 'サ変・スル' ? 'すっぺ' : `${base}っぺ`;
-          else f = `${stem}まい`;
+          else if (P.vol === 'mai') f = `${stem}まい`;
+          else {
+            // 未然形（ア段）＋まい／ざあ：行かまい・行かざあ
+            if (t.ctype === 'サ変・スル' || t.ctype.startsWith('カ変')) {
+              emit(stem, 'plain', true);
+              i++;
+              continue;
+            }
+            const lastK = stem.slice(-1);
+            const mz = verb.ctype === '一段' ? stem.replace(/よ$/, '') : stem.slice(0, -1) + (lastK === 'お' ? 'わ' : shiftRow(lastK, 'a'));
+            f = mz + (P.vol === 'maiA' ? 'まい' : 'ざあ');
+          }
           emit(f, 'plain', true);
           i += 2;
           continue;
@@ -412,7 +547,7 @@ export function convertTokens(T: Tok[], P: Profile): string {
       }
       // 命令「〜なさい」
       if (P.nasai && (t.cform === '連用形') && T[i + 1]?.base === 'なさる' && T[i + 1].cform.startsWith('命令')) {
-        emit(P.nasai(stem, vowelOf(t.read.slice(-1))), 'plain', true);
+        emit(P.nasai(stem, vowelOf(t.read.slice(-1)), verb.ctype), 'plain', true);
         i += 2;
         continue;
       }
@@ -497,8 +632,29 @@ export function convertTokens(T: Tok[], P: Profile): string {
           continue;
         }
       }
+      // 語彙（語幹を差し替えて活用）
+      const tgt = P.adjs?.[t.base];
+      let adjSurface = t.s;
+      if (tgt) {
+        const kaOnly = tgt.endsWith('か');
+        if (kaOnly) {
+          if (t.cform === '基本形' && kaContext(T, i + 1)) {
+            emit(tgt, 'plain', true);
+            i++;
+            continue;
+          }
+        } else {
+          const srcStem = t.base.slice(0, -1);
+          if (t.s.startsWith(srcStem)) adjSurface = tgt.slice(0, -1) + t.s.slice(srcStem.length);
+        }
+      }
+      if (t.cform !== '基本形' && adjSurface !== t.s) {
+        emit(adjSurface, 'plain', true);
+        i++;
+        continue;
+      }
       if (t.cform === '基本形') {
-        let s = t.s;
+        let s = adjSurface;
         const kaPos = isEnd(T[i + 1]) || (!!particleSeq(T, i + 1) && particleSeq(T, i + 1)?.seq !== 'よね') ||
           isConj(T[i + 1], 'から', 'けど', 'けれど', 'けれども') || (T[i + 1]?.pos === '名詞' && T[i + 1].p1 !== '非自立') ||
           (!!P.noda && T[i + 1]?.p1 === '非自立' && ['ん', 'の'].includes(T[i + 1].s) && isCop(T[i + 2]));
@@ -512,18 +668,13 @@ export function convertTokens(T: Tok[], P: Profile): string {
           s = P.sugoi;
         } else if (t.base === 'ない' && t.p1 === '自立' && P.nai) {
           s = P.nai;
-        } else if (P.adjEe && !isDesu(T[i + 1])) {
+        } else if (P.adjEe && !isDesu(T[i + 1]) && !tgt) {
           const e = eeForm(t);
           if (e) s = e;
         }
         // 「いいじゃない」で確認の言い方を持たない方言は、形容詞も共通語のまま
         if (T[i + 1]?.s === 'じゃ' && T[i + 1].pos === '助詞' && isNai(T[i + 2]) && !P.tag) s = t.s;
-        if (P.adjKa && s.endsWith('い')) {
-          const n = T[i + 1];
-          const ps = particleSeq(T, i + 1);
-          const kaCtx = isEnd(n) || (ps && ps.seq !== 'よね') || isConj(n, 'から', 'けど', 'けれど', 'けれども');
-          if (kaCtx) s = `${s.slice(0, -1)}か`;
-        }
+        if (P.adjKa && s.endsWith('い') && kaContext(T, i + 1)) s = `${s.slice(0, -1)}か`;
         emit(s, 'plain', true);
         lastAdj = { at: out.length - 1, tok: t };
         i++;
@@ -568,6 +719,13 @@ export function convertTokens(T: Tok[], P: Profile): string {
     }
     if (isConj(t, 'けど', 'けれど', 'けれども') && (ctx === 'plain' || ctx === 'other') && P.kedo) {
       emit(P.kedo, 'other');
+      i++;
+      continue;
+    }
+
+    // ---- 疑問の「か？」 ----
+    if (P.qKa && t.s === 'か' && t.pos === '助詞' && t.p1.includes('終助詞') && isQuestionMark(T[i + 1]) && ctx === 'plain') {
+      emit(P.qKa, 'other');
       i++;
       continue;
     }
