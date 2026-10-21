@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { DIALECTS } from '../../src/shared/dialects';
-import { dialectConvert, isRuleSupported, PROFILES, type Tokenize } from '../../src/shared/engine';
+import { dialectConvert, isRuleSupported, isRyukyu, PROFILES, ryukyuMissing, type Tokenize } from '../../src/shared/engine';
 import { nodeTokenizer } from '../support/tokenizer';
 import { CORPUS } from './corpus';
 
@@ -12,16 +12,23 @@ beforeAll(async () => {
 const cv = (id: string, s: string) => dialectConvert(tk, id, s);
 
 const SUPPORTED = DIALECTS.filter((d) => isRuleSupported(d.id));
+/** 日本語の方言（琉球諸語は別の検査） */
+const MAINLAND = SUPPORTED.filter((d) => !isRyukyu(d.id));
 
 describe('方言プロファイル', () => {
   it('全方言にプロファイルがある', () => {
     for (const d of DIALECTS) expect(PROFILES[d.id], d.id).toBeDefined();
   });
-  it('琉球諸語・八丈方言は規則変換の対象外（静的版では選べない）', () => {
-    for (const id of ['okinawa', 'miyako', 'yaeyama', 'hachijo']) {
-      expect(isRuleSupported(id)).toBe(false);
-      expect(cv(id, '今日はとても暑いですね。')).toBe('今日はとても暑いですね。');
+  it('八丈方言は規則変換の対象外（静的版では選べない）', () => {
+    expect(isRuleSupported('hachijo')).toBe(false);
+    expect(cv('hachijo', '今日はとても暑いですね。')).toBe('今日はとても暑いですね。');
+  });
+  it('琉球諸語（沖縄語・宮古語・八重山語）は文全体を訳す方式で対応する', () => {
+    for (const id of ['okinawa', 'miyako', 'yaeyama']) {
+      expect(isRuleSupported(id)).toBe(true);
+      expect(isRyukyu(id)).toBe(true);
     }
+    expect(isRyukyu('uchinaa')).toBe(false);
   });
 });
 
@@ -150,19 +157,19 @@ describe('期待どおりに変換される（厳密一致）', () => {
 
 describe('意味を変えない（安全側に倒す）', () => {
   it('過去の「だ」（読んだ）は変えない', () => {
-    for (const d of SUPPORTED) expect(cv(d.id, 'この本を読んだ。'), d.id).toContain('読んだ');
+    for (const d of MAINLAND) expect(cv(d.id, 'この本を読んだ。'), d.id).toContain('読んだ');
   });
   it('依頼の「〜ないで」は否定形に変えない', () => {
-    for (const d of SUPPORTED) {
+    for (const d of MAINLAND) {
       if (d.region === 'キャラ') continue;
       expect(cv(d.id, '行かないで。'), d.id).toBe('行かないで。');
     }
   });
   it('「いる」を「いん」などの誤形にしない', () => {
-    for (const d of SUPPORTED) expect(cv(d.id, 'あの人はいないよ。'), d.id).not.toMatch(/いん[にでよ。]/);
+    for (const d of MAINLAND) expect(cv(d.id, 'あの人はいないよ。'), d.id).not.toMatch(/いん[にでよ。]/);
   });
   it('同じ語尾を重ねない', () => {
-    for (const d of SUPPORTED)
+    for (const d of MAINLAND)
       for (const s of CORPUS) {
         const out = cv(d.id, s);
         expect(out, `${d.id}: ${s}`).not.toMatch(/(っちゃ|ばい|けえ|けん|やで|じゃ|ぜ|ざ|に|で|よ|ね|わ)\1[。！？]/);
@@ -195,4 +202,33 @@ describe('正解コーパス（全方言 × 76 文、目視レビュー済み）
       for (const s of CORPUS) expect(cv(d.id, s), s).toBe(gold[d.id][s]);
     });
   }
+});
+
+describe('琉球諸語（文全体を訳せたときだけ訳す）', () => {
+  const EXTRA = [
+    '今日はとても暑いね', '私は先生です', 'これは何ですか', '沖縄に行きたい', '明日は雨だろう', '疲れたから、もう帰るね',
+    'お茶を飲みますか？', 'どこに行くの？', '子どもが遊んでいる', '手紙を書いた', 'お酒は飲みません', 'ありがとう', 'ようこそ',
+  ];
+  it('共通語と混ざった文を作らない（訳せたら漢字・共通語の語が残らない）', () => {
+    for (const id of ['okinawa', 'miyako', 'yaeyama'])
+      for (const s of [...CORPUS, ...EXTRA]) {
+        const out = cv(id, s);
+        if (out === s) continue;
+        expect(out, `${id}: ${s}`).not.toMatch(/\p{Script=Han}/u);
+        expect(ryukyuMissing(tk, id, s), `${id}: ${s}`).toBeNull();
+      }
+  });
+  it('訳せないときは訳せなかった語を返す', () => {
+    expect(ryukyuMissing(tk, 'okinawa', '疲れたから、もう帰るね')).toEqual(['疲れる']);
+    expect(ryukyuMissing(tk, 'okinawa', '今日はとても暑いね')).toBeNull();
+    expect(ryukyuMissing(tk, 'miyako', '今日はとても暑いね')).toEqual(['今日はとても暑いね']);
+    expect(ryukyuMissing(tk, 'osaka', '今日はとても暑いね')).toBeNull();
+  });
+  it('宮古語・八重山語は確かめられた決まった挨拶だけを訳す', () => {
+    expect(cv('miyako', 'ありがとう。')).toBe('たんでぃがーたんでぃ。');
+    expect(cv('miyako', 'ようこそ！')).toBe('んみゃーち！');
+    expect(cv('yaeyama', 'ありがとうございます')).toBe('みーふぁいゆー');
+    expect(cv('yaeyama', 'いらっしゃいませ')).toBe('おーりとーり');
+    expect(cv('yaeyama', '本当にありがとう')).toBe('本当にありがとう');
+  });
 });

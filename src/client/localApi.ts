@@ -1,5 +1,6 @@
 import { DIALECT_MAP } from '../shared/dialects';
-import { dialectConvert, isRuleSupported } from '../shared/engine';
+import { dialectConvert, isRuleSupported, ryukyuMissing } from '../shared/engine';
+import { ryukyuMissingWords } from './ryukyuNote';
 import { ApiError, type Phrase } from './api';
 import { getTokenizer } from './tokenizer';
 
@@ -65,6 +66,7 @@ export const localApi = {
       throw new ApiError(503, 'dict');
     }
     if (signal?.aborted) throw new DOMException('aborted', 'AbortError');
+    ryukyuMissingWords.value = ryukyuMissing(tokenize, dialect, text);
     const chars = Array.from(dialectConvert(tokenize, dialect, text));
     for (let i = 0; i < chars.length; i += 2) {
       if (signal?.aborted) throw new DOMException('aborted', 'AbortError');

@@ -1,4 +1,4 @@
-import { expect, flick, pickDialect, ready, test, touchFlick } from './fixtures';
+import { convertText, expect, flick, pickDialect, ready, test, touchFlick } from './fixtures';
 
 // 静的版（GitHub Pages 用、サーバー・登録なし）
 
@@ -27,15 +27,28 @@ test('サブパス配下で起動し、JS 前の入力が引き継がれる・AP
   void consoleErrors;
 });
 
-test('琉球諸語など規則変換できない方言は静的版では選べない', async ({ page, consoleErrors }) => {
+test('八丈方言は静的版では選べない。琉球諸語は選べる', async ({ page, consoleErrors }) => {
   await page.goto('./');
   await ready(page);
+  await page.locator('#shell-q').fill('はちじょう');
+  await expect(page.getByTestId('dialect-hit')).toHaveCount(0);
   await page.locator('#shell-q').fill('おきなわ');
   const hits = page.getByTestId('dialect-hit');
-  await expect(hits).toHaveCount(1);
-  await expect(hits.first()).toContainText('うちなーやまとぐち');
+  await expect(hits.filter({ hasText: '沖縄語' })).toHaveCount(1);
+  await expect(hits.filter({ hasText: 'うちなーやまとぐち' })).toHaveCount(1);
   await page.locator('#shell-q').fill('みやこ');
-  await expect(page.getByTestId('dialect-hit')).toHaveCount(0);
+  await expect(page.getByTestId('dialect-hit').filter({ hasText: '宮古語' })).toHaveCount(1);
+  void consoleErrors;
+});
+
+test('沖縄語: 文全体を訳し、訳せない語があれば訳さずに伝える', async ({ page, consoleErrors }) => {
+  await page.goto('./');
+  await ready(page);
+  await pickDialect(page, 'おきなわご', '沖縄語');
+  expect(await convertText(page, '本当にありがとうございます')).toBe('じゅんに にふぇーでーびる');
+  expect(await convertText(page, '今日はとても暑いね')).toBe('ちゅーや いっぺー あちさやー');
+  expect(await convertText(page, '疲れたから、もう帰るね')).toBe('疲れたから、もう帰るね');
+  await expect(page.getByTestId('no-change')).toHaveText('沖縄語に訳せない言葉（疲れる）があるため、訳していません');
   void consoleErrors;
 });
 

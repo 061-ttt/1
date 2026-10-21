@@ -195,7 +195,9 @@
 }
 .pin.off .pin-name { color: var(--ink-2); }
 .pin.said { background: color-mix(in srgb, var(--c) 14%, #fff); }
-#map.ready .pin.same { opacity: 0.6; }
+#map.ready .pin.same,
+#map.ready .pin.nofit { opacity: 0.6; }
+.pin.nofit { border-style: dashed; }
 .pin-say {
   display: none;
   max-width: 11em;
@@ -204,17 +206,20 @@
   font-weight: 500;
 }
 #map.near .pin.said .pin-say,
-#map.near .pin.same .pin-say {
+#map.near .pin.same .pin-say,
+#map.near .pin.nofit .pin-say {
   display: block;
 }
 #map.near .pin.said,
-#map.near .pin.same {
+#map.near .pin.same,
+#map.near .pin.nofit {
   border-radius: 14px;
   padding-top: 3px;
   padding-bottom: 3px;
 }
 #map.near .pin.said .pin-name,
-#map.near .pin.same .pin-name {
+#map.near .pin.same .pin-name,
+#map.near .pin.nofit .pin-name {
   font-size: 10.5px;
   color: color-mix(in srgb, var(--c) 70%, var(--ink));
 }

@@ -626,7 +626,13 @@ const AIZU: Profile = mix(TOHOKU, {
 });
 
 // ==================== 沖縄 ====================
-const UCHINAA: Profile = { copYo: 'さー', yo: 'さー', very: 'でーじ', nodaKeep: true };
+const UCHINAA: Profile = {
+  copYo: 'さー', yo: 'さー', ne: 'ねー', very: 'でーじ', nodaKeep: true,
+  // 沖縄で日常的に使われる語（All About「沖縄の方言」、ニコニコ大百科「琉球方言」で確認）
+  phrases: [
+    ['適当', 'てーげー'],
+  ],
+};
 
 // ==================== キャラ口調 ====================
 const OJOUSAMA: Profile = {
@@ -685,7 +691,10 @@ export const PROFILES: Record<string, Profile> = {
   sanuki: SANUKI, awa: AWA, iyo: IYO, tosa: TOSA,
   hakata: HAKATA, kitakyushu: KITAKYUSHU, saga: SAGA, nagasaki: NAGASAKI, chikugo: CHIKUGO, kumamoto: KUMAMOTO, oita: OITA,
   miyazaki: MIYAZAKI, satsuma: SATSUMA,
-  uchinaa: UCHINAA, okinawa: UNSUPPORTED, miyako: UNSUPPORTED, yaeyama: UNSUPPORTED, hachijo: UNSUPPORTED,
+  uchinaa: UCHINAA,
+  // 琉球諸語は ryukyu.ts で文全体を訳す（プロファイルは使わない）
+  okinawa: {}, miyako: {}, yaeyama: {},
+  hachijo: UNSUPPORTED,
   ojousama: OJOUSAMA, bushi: BUSHI, oiran: OIRAN, gyaru: GYARU, neko: NEKO,
 };
 

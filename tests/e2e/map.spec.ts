@@ -100,7 +100,7 @@ test('文を入れると全方言が一度に変換され、変わらない方�
   await page.goto('map/');
   await mapReady(page);
   await page.locator('#q').fill('今日はとても暑いね');
-  await expect(page.getByTestId('summary')).toContainText('53 の方言のうち', { timeout: 30_000 });
+  await expect(page.getByTestId('summary')).toContainText('56 の方言のうち', { timeout: 30_000 });
   await expect(page.locator('.pin[data-id="osaka"]')).toHaveAttribute('aria-label', '大阪弁: 今日はめっちゃ暑いなあ');
   await expect(page.locator('.pin[data-id="hakata"]')).toHaveAttribute('aria-label', '博多弁: 今日はばり暑かね');
   await expect(page.locator('.pin[data-id="hokkaido"]')).toHaveAttribute('aria-label', '北海道弁: 今日はなまら暑いね');
@@ -109,10 +109,15 @@ test('文を入れると全方言が一度に変換され、変わらない方�
   await expect(page.locator('.pin[data-id="nanbu"]')).toHaveClass(/\bsame\b/);
   const changed = await page.locator('.pin.said').count();
   const same = await page.locator('.pin.same').count();
-  expect(changed + same).toBe(53);
-  await expect(page.getByTestId('summary')).toHaveText(`53 の方言のうち ${changed} で言い方が変わりました`);
-  // 規則変換できない言語は結果を持たない
-  await expect(page.locator('.pin[data-id="okinawa"]')).toHaveAttribute('aria-label', '沖縄語');
+  const nofit = await page.locator('.pin.nofit').count();
+  expect(changed + same + nofit).toBe(56);
+  await expect(page.getByTestId('summary')).toHaveText(`56 の方言のうち ${changed} で言い方が変わりました`);
+  // 沖縄語は文全体を訳す。宮古語はこの文を訳せないので、訳せないことを示す
+  await expect(page.locator('.pin[data-id="okinawa"]')).toHaveAttribute('aria-label', '沖縄語: ちゅーや いっぺー あちさやー');
+  await expect(page.locator('.pin[data-id="miyako"]')).toHaveClass(/\bnofit\b/);
+  await expect(page.locator('.pin[data-id="miyako"]')).toHaveAttribute('aria-label', '宮古語: この文は訳せません');
+  // 規則変換できない方言は結果を持たない
+  await expect(page.locator('.pin[data-id="hachijo"]')).toHaveAttribute('aria-label', '八丈方言');
   // 入力を消すと元に戻り、例文が出る
   await page.getByRole('button', { name: '入力を消す' }).click();
   await expect(page.locator('.pin.said')).toHaveCount(0);
@@ -213,11 +218,31 @@ test('共有リンク（?q= と #方言）で開くと、その方言のカー�
   void consoleErrors;
 });
 
-test('規則で変換できない言語のカードは、変換できないことを伝える', async ({ page, consoleErrors }) => {
-  await page.goto('map/?q=' + encodeURIComponent('ありがとう') + '#okinawa');
+test('琉球諸語: 訳せる文は訳し、訳せない文は訳せない語を伝える', async ({ page, consoleErrors }) => {
+  await page.goto('map/?q=' + encodeURIComponent('本当にありがとうございます') + '#okinawa');
   await mapReady(page);
   const card = page.getByRole('dialog');
   await expect(card.getByRole('heading')).toHaveText('沖縄語', { timeout: 10_000 });
+  await expect(page.getByTestId('card-said')).toHaveText('じゅんに にふぇーでーびる', { timeout: 30_000 });
+  await expect(card.getByRole('button', { name: 'コピー' })).toBeEnabled();
+  // 訳せない語を含む文
+  await page.locator('#q').fill('疲れたから、もう帰るね');
+  await expect(card).toContainText('「疲れる」の沖縄語訳がまだ辞書にないため、この文は訳していません。');
+  await expect(card.getByRole('button', { name: 'コピー' })).toBeDisabled();
+  // 宮古語は決まった挨拶だけ
+  await card.getByRole('button', { name: '次の方言' }).click();
+  await expect(card.getByRole('heading')).toHaveText('宮古語');
+  await expect(card).toContainText('宮古語で訳せるのは、今のところ「ありがとう」「ようこそ」などの決まった挨拶だけです。');
+  await page.locator('#q').fill('ありがとう');
+  await expect(page.getByTestId('card-said')).toHaveText('たんでぃがーたんでぃ');
+  void consoleErrors;
+});
+
+test('規則で変換できない方言（八丈方言）のカードは、変換できないことを伝える', async ({ page, consoleErrors }) => {
+  await page.goto('map/?q=' + encodeURIComponent('ありがとう') + '#hachijo');
+  await mapReady(page);
+  const card = page.getByRole('dialog');
+  await expect(card.getByRole('heading')).toHaveText('八丈方言', { timeout: 10_000 });
   await expect(card).toContainText('この地図版では変換できません');
   await expect(card.getByRole('button', { name: 'コピー' })).toBeDisabled();
   void consoleErrors;

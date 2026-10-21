@@ -3,7 +3,7 @@ void import('./fonts.css');
 import './map.css';
 import { Vector3 } from 'three';
 import { DIALECTS, type Dialect } from '../shared/dialects';
-import { dialectConvertMany, isRuleSupported, type Tokenize } from '../shared/engine';
+import { dialectConvertMany, isRuleSupported, isRyukyu, ryukyuMissing, SOUTH_EXAMPLES, type Tokenize } from '../shared/engine';
 import { getTokenizer } from '../client/tokenizer';
 import { PLACES, project, REGION_COLOR } from './places';
 import { createScene, toWorld } from './scene';
@@ -154,6 +154,8 @@ const SUPPORTED = pins.filter((p) => p.ok).map((p) => p.d.id);
 
 let tokenize: Tokenize | null = null;
 let results: Record<string, string> | null = null;
+/** 琉球諸語で訳せなかった語（方言 ID → 語） */
+let missingWords: Record<string, string[]> = {};
 let text = '';
 let dictFailed = false;
 
@@ -186,7 +188,7 @@ function setStatus() {
     p.dataset.testid = 'dict-loading';
     p.textContent = '辞書を読み込んでいます（初回のみ）';
   } else {
-    const changed = SUPPORTED.filter((id) => results![id] !== text).length;
+    const changed = SUPPORTED.filter((id) => results![id] !== text && !missingWords[id]).length;
     p.dataset.testid = 'summary';
     p.textContent = changed ? `${SUPPORTED.length} の方言のうち ${changed} で言い方が変わりました` : 'どの方言でも共通語と同じ言い方です';
   }
@@ -198,12 +200,14 @@ function applyResults(animate: boolean) {
   for (const p of pins) {
     const r = results?.[p.d.id];
     const has = !!text && !!results;
-    const same = has && p.ok && r === text;
-    p.el.classList.toggle('said', has && p.ok && !same);
+    const nofit = has && p.ok && !!missingWords[p.d.id];
+    const same = has && p.ok && !nofit && r === text;
+    p.el.classList.toggle('said', has && p.ok && !same && !nofit);
     p.el.classList.toggle('same', same);
-    p.say.textContent = has && p.ok ? r! : '';
-    p.el.setAttribute('aria-label', has && p.ok ? `${p.d.name}: ${r}` : p.d.name);
-    if (has && p.ok && !same) order.push(p);
+    p.el.classList.toggle('nofit', nofit);
+    p.say.textContent = nofit ? '訳せない語があります' : has && p.ok ? r! : '';
+    p.el.setAttribute('aria-label', nofit ? `${p.d.name}: この文は訳せません` : has && p.ok ? `${p.d.name}: ${r}` : p.d.name);
+    if (has && p.ok && !same && !nofit) order.push(p);
   }
   measure();
   if (animate && !reduceMotion) {
@@ -232,6 +236,12 @@ function convertNow(animate: boolean) {
     return;
   }
   results = dialectConvertMany(tokenize, SUPPORTED, text);
+  missingWords = {};
+  for (const id of SUPPORTED) {
+    if (!isRyukyu(id)) continue;
+    const m = ryukyuMissing(tokenize, id, text);
+    if (m) missingWords[id] = m;
+  }
   applyResults(animate);
 }
 
@@ -570,11 +580,19 @@ function fillCard(p: Pin) {
   } else if (!r) {
     said.textContent = text;
     said.classList.add('pending');
+  } else if (missingWords[p.d.id]) {
+    // 琉球諸語は、文全体を訳せたときだけ訳す（共通語と混ぜない）
+    said.textContent = text;
+    said.classList.add('empty');
+    note.textContent =
+      p.d.id === 'okinawa'
+        ? `「${missingWords[p.d.id].slice(0, 3).join('」「')}」の${p.d.name}訳がまだ辞書にないため、この文は訳していません。`
+        : `${p.d.name}で訳せるのは、今のところ「${SOUTH_EXAMPLES.join('」「')}」などの決まった挨拶だけです。`;
   } else {
     said.textContent = r;
     if (r === text) note.textContent = 'この文は共通語と同じ言い方になります。';
   }
-  copy.disabled = !(p.ok && r);
+  copy.disabled = !(p.ok && r) || !!missingWords[p.d.id];
   copy.textContent = 'コピー';
   (card.querySelector('.card-hints') as HTMLElement).textContent = p.d.hints;
   const i = pins.indexOf(p);

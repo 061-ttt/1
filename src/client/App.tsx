@@ -45,6 +45,8 @@ import {
 import { dictState, getTokenizer } from './tokenizer';
 import { api } from './api';
 import { IS_STATIC } from './mode';
+import { ryukyuMissingWords } from './ryukyuNote';
+import { SOUTH_EXAMPLES } from '../shared/engine';
 import { SwipeCard } from './SwipeCard';
 import { animate, SPRING_BOUNCY } from './motion';
 import {
@@ -97,6 +99,15 @@ function pick(id: string) {
 }
 
 /* ---------------- 検索バー（静的 HTML の input をそのまま使う） ---------------- */
+
+/** 琉球諸語に訳せなかったときの案内 */
+function ryukyuNote(id: string): string | null {
+  const miss = ryukyuMissingWords.value;
+  if (!miss) return null;
+  const name = DIALECT_MAP[id]?.name ?? '';
+  if (id !== 'okinawa') return `${name}で訳せるのは、今のところ「${SOUTH_EXAMPLES.join('」「')}」などの決まった挨拶だけです`;
+  return `${name}に訳せない言葉（${miss.slice(0, 3).join('、')}）があるため、訳していません`;
+}
 
 function SearchExtras() {
   const host = document.querySelector('#shell-top .searchbox');
@@ -243,6 +254,7 @@ function SearchPanel() {
                         setInput(h.source);
                         output.value = h.result;
                         outputSource.value = h.source;
+                        ryukyuMissingWords.value = null;
                         outputDialect.value = h.dialect;
                         tab.value = 'convert';
                       });
@@ -414,7 +426,7 @@ function Converter() {
             <>
               <Streamed text={output.value} />
               {!converting.value && output.value === outputSource.value && (
-                <p class="rc-same" data-testid="no-change">この文には変換できる表現が見つかりませんでした</p>
+                <p class="rc-same" data-testid="no-change">{ryukyuNote(outD?.id ?? d.id) ?? 'この文には変換できる表現が見つかりませんでした'}</p>
               )}
             </>
           ) : (

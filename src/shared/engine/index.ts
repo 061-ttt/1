@@ -1,9 +1,11 @@
 import { convertText, convertTokens } from './engine';
 import { PROFILES } from './profiles';
+import { isRyukyu, ryukyuConvert, type RyukyuResult } from './ryukyu';
 import type { Tok, Tokenize } from './types';
 
 export type { Tok, Tokenize } from './types';
 export { isRuleSupported, PROFILES } from './profiles';
+export { isRyukyu, SOUTH_EXAMPLES, type RyukyuResult } from './ryukyu';
 
 /** kuromoji の IpadicFeatures を Tok に変換 */
 export function fromKuromoji(x: {
@@ -19,6 +21,8 @@ export function fromKuromoji(x: {
 export function dialectConvert(tokenize: Tokenize, dialectId: string, text: string): string {
   const P = PROFILES[dialectId];
   if (!P || P.unsupported) return text;
+  // 琉球諸語は文全体を訳せたときだけ訳文を返す（訳せなければ共通語のまま）
+  if (isRyukyu(dialectId)) return ryukyuConvert(tokenize, dialectId, text).text ?? text;
   return convertText(tokenize, P, text);
 }
 
@@ -36,12 +40,28 @@ export function dialectConvertMany(tokenize: Tokenize, ids: string[], text: stri
       trail: line.match(/\s*$/)?.[0] ?? '',
     };
   });
+  const cache = new Map<string, Tok[]>();
+  for (const l of lines) if (l.toks) cache.set(l.line.trim(), l.toks);
+  const memo: Tokenize = (s) => cache.get(s) ?? tokenize(s);
   const out: Record<string, string> = {};
   for (const id of ids) {
     const P = PROFILES[id];
+    if (P && !P.unsupported && isRyukyu(id)) {
+      out[id] = ryukyuConvert(memo, id, text).text ?? text;
+      continue;
+    }
     out[id] = !P || P.unsupported
       ? text
       : lines.map((l) => (l.toks ? l.lead + convertTokens(l.toks, P) + l.trail : l.line)).join('\n');
   }
   return out;
+}
+
+/**
+ * 琉球諸語で訳せなかった理由（訳せなかった語）。琉球諸語以外や、訳せたときは null。
+ */
+export function ryukyuMissing(tokenize: Tokenize, dialectId: string, text: string): string[] | null {
+  if (!isRyukyu(dialectId) || !text.trim()) return null;
+  const r: RyukyuResult = ryukyuConvert(tokenize, dialectId, text);
+  return r.text === null ? r.missing : null;
 }
