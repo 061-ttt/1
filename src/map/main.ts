@@ -49,7 +49,19 @@ const shortName = (d: Dialect) =>
 /** アイコンの 1 文字（隣り合う方言と同じ字になるものだけ別の字に） */
 const ICON: Record<string, string> = { mie: '伊', uchinaa: 'や' };
 
-const SAMPLES = ['今日はとても暑いね', '疲れたから、もう帰るね', '明日は雨だろう', 'そんなことしたらだめだよ'];
+/** 例文（多くの方言で言い方が変わるもの・沖縄語でも訳せるものを選んだ） */
+const SAMPLES = [
+  '今日はとても暑いね',
+  '明日は雨だろう',
+  '疲れたから、もう帰るね',
+  '雨が降っているから、今日は行かない',
+  'まだ何も食べていない',
+  'そんなことしたらだめだよ',
+  '大丈夫だよ',
+  'それは本当にいいね',
+  'どこに行くの？',
+  '本当にありがとうございます',
+];
 
 /* ---------- DOM ---------- */
 
@@ -159,27 +171,89 @@ let missingWords: Record<string, string[]> = {};
 let text = '';
 let dictFailed = false;
 
+/* ---------- 例文のカルーセル ---------- */
+
+statusEl.innerHTML = `
+  <div class="carousel" role="region" aria-roledescription="カルーセル" aria-label="例文">
+    <button type="button" class="car-btn" data-dir="-1" aria-label="前の例文">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="samples" data-testid="samples"></div>
+    <button type="button" class="car-btn" data-dir="1" aria-label="次の例文">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+    </button>
+  </div>
+  <p class="status-line" aria-live="polite"></p>`;
+const carousel = statusEl.querySelector('.carousel') as HTMLElement;
+const track = statusEl.querySelector('.samples') as HTMLElement;
+const statusLine = statusEl.querySelector('.status-line') as HTMLElement;
+const sampleBtns = SAMPLES.map((text, i) => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'sample';
+  b.textContent = text;
+  b.setAttribute('aria-pressed', 'false');
+  b.setAttribute('aria-label', `例文 ${i + 1}/${SAMPLES.length}: ${text}`);
+  b.tabIndex = i === 0 ? 0 : -1;
+  b.addEventListener('click', () => {
+    input.value = text;
+    onInput(true);
+  });
+  track.appendChild(b);
+  return b;
+});
+
+/** 端まで来たら矢印を無効にし、続きがある側だけ端をぼかす */
+function updateCarousel() {
+  const max = track.scrollWidth - track.clientWidth;
+  const atStart = track.scrollLeft <= 2;
+  const atEnd = track.scrollLeft >= max - 2;
+  carousel.classList.toggle('at-start', atStart);
+  carousel.classList.toggle('at-end', atEnd);
+  (carousel.querySelector('[data-dir="-1"]') as HTMLButtonElement).disabled = atStart;
+  (carousel.querySelector('[data-dir="1"]') as HTMLButtonElement).disabled = atEnd;
+}
+track.addEventListener('scroll', updateCarousel, { passive: true });
+window.addEventListener('resize', updateCarousel);
+carousel.addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest('.car-btn') as HTMLElement | null;
+  if (!btn) return;
+  track.scrollBy({ left: Number(btn.dataset.dir) * track.clientWidth * 0.8, behavior: reduceMotion ? 'auto' : 'smooth' });
+});
+// ← → で例文を移る（ロービングタブインデックス）
+track.addEventListener('keydown', (e) => {
+  const i = sampleBtns.indexOf(document.activeElement as HTMLButtonElement);
+  if (i < 0) return;
+  let j = -1;
+  if (e.key === 'ArrowRight') j = Math.min(i + 1, sampleBtns.length - 1);
+  else if (e.key === 'ArrowLeft') j = Math.max(i - 1, 0);
+  else if (e.key === 'Home') j = 0;
+  else if (e.key === 'End') j = sampleBtns.length - 1;
+  if (j < 0) return;
+  e.preventDefault();
+  focusSample(j);
+});
+function focusSample(j: number) {
+  sampleBtns.forEach((b, k) => (b.tabIndex = k === j ? 0 : -1));
+  sampleBtns[j].focus({ preventScroll: true });
+  sampleBtns[j].scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+}
+
 function setStatus() {
-  statusEl.replaceChildren();
-  if (!text) {
-    const row = document.createElement('div');
-    row.className = 'samples';
-    for (const s of SAMPLES) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'sample';
-      b.textContent = s;
-      b.addEventListener('click', () => {
-        input.value = s;
-        onInput(true);
-      });
-      row.appendChild(b);
-    }
-    statusEl.appendChild(row);
-    return;
+  // 選んでいる例文を示し、見える位置へ
+  const cur = SAMPLES.indexOf(text);
+  sampleBtns.forEach((b, k) => b.setAttribute('aria-pressed', String(k === cur)));
+  if (cur >= 0) {
+    sampleBtns.forEach((b, k) => (b.tabIndex = k === cur ? 0 : -1));
+    sampleBtns[cur].scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
   }
-  const p = document.createElement('p');
+  updateCarousel();
+
+  const p = statusLine;
   p.className = 'status-line';
+  delete p.dataset.testid;
+  p.textContent = '';
+  if (!text) return;
   if (dictFailed) {
     p.classList.add('error');
     p.textContent = '辞書を読み込めませんでした。通信状態を確認して、もう一度入力してください。';
@@ -192,7 +266,6 @@ function setStatus() {
     p.dataset.testid = 'summary';
     p.textContent = changed ? `${SUPPORTED.length} の方言のうち ${changed} で言い方が変わりました` : 'どの方言でも共通語と同じ言い方です';
   }
-  statusEl.appendChild(p);
 }
 
 function applyResults(animate: boolean) {

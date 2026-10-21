@@ -121,7 +121,8 @@ test('文を入れると全方言が一度に変換され、変わらない方�
   // 入力を消すと元に戻り、例文が出る
   await page.getByRole('button', { name: '入力を消す' }).click();
   await expect(page.locator('.pin.said')).toHaveCount(0);
-  await expect(page.locator('.sample')).toHaveCount(4);
+  await expect(page.locator('.sample')).toHaveCount(10);
+  await expect(page.locator('.sample[aria-pressed="true"]')).toHaveCount(0);
   void consoleErrors;
 });
 
@@ -267,6 +268,69 @@ test('タッチ操作: タップで開き、地図の空いた所をタップす
   void consoleErrors;
 });
 
+/** 例文が帯の見える範囲に収まっているか */
+async function inTrack(page: Page, i: number) {
+  return page.evaluate((i) => {
+    const t = document.querySelector('.samples')!.getBoundingClientRect();
+    const b = document.querySelectorAll('.sample')[i].getBoundingClientRect();
+    return b.left >= t.left - 1 && b.right <= t.right + 1;
+  }, i);
+}
+
+test('例文は 10 個のカルーセル。指で横に送れて、最後の例文も選べる', async ({ page, consoleErrors }) => {
+  await page.goto('map/');
+  await mapReady(page);
+  const chips = page.locator('.sample');
+  await expect(chips).toHaveCount(10);
+  await expect(page.locator('.carousel')).toHaveClass(/at-start/);
+  // 矢印はタッチの画面では出さない
+  await expect(page.getByRole('button', { name: '次の例文' })).toBeHidden();
+  expect(await inTrack(page, 9)).toBe(false);
+  // 横スワイプで送る
+  const box = (await page.locator('.samples').boundingBox())!;
+  const cdp = await page.context().newCDPSession(page);
+  const y = box.y + box.height / 2;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: box.x + box.width - 20, y }] });
+  for (let k = 1; k <= 12; k++)
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: box.x + box.width - 20 - k * 22, y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(page.locator('.carousel')).not.toHaveClass(/at-start/);
+  // 最後の例文まで送って選ぶ
+  await chips.last().scrollIntoViewIfNeeded();
+  await expect(page.locator('.carousel')).toHaveClass(/at-end/);
+  await chips.last().click();
+  await expect(page.locator('#q')).toHaveValue('本当にありがとうございます');
+  await expect(chips.last()).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('summary')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.pin[data-id="okinawa"]')).toHaveAttribute('aria-label', '沖縄語: じゅんに にふぇーでーびる');
+  // 別の例文に切り替えられる（入力中でもカルーセルは残る）
+  await chips.first().scrollIntoViewIfNeeded();
+  await chips.first().click();
+  await expect(page.locator('#q')).toHaveValue('今日はとても暑いね');
+  await expect(chips.first()).toHaveAttribute('aria-pressed', 'true');
+  await expect(chips.last()).toHaveAttribute('aria-pressed', 'false');
+  void consoleErrors;
+});
+
+test('例文のカルーセルはキーボードでも操作できる（← → Home End）', async ({ page, consoleErrors }) => {
+  await page.goto('map/');
+  await mapReady(page);
+  const chips = page.locator('.sample');
+  await chips.first().focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(chips.nth(1)).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(chips.last()).toBeFocused();
+  await expect.poll(() => inTrack(page, 9)).toBe(true);
+  await page.keyboard.press('Home');
+  await expect(chips.first()).toBeFocused();
+  // Tab で入るのは 1 つだけ（ロービング）
+  expect(await chips.evaluateAll((els) => els.filter((e) => (e as HTMLElement).tabIndex === 0).length)).toBe(1);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#q')).toHaveValue('今日はとても暑いね');
+  void consoleErrors;
+});
+
 test.describe('パソコンの画面', () => {
   test.use({ viewport: { width: 1280, height: 800 }, isMobile: false, hasTouch: false });
   test('横長の画面でも全アイコンが重ならずに収まる', async ({ page, consoleErrors }) => {
@@ -276,6 +340,26 @@ test.describe('パソコンの画面', () => {
     const bs = await boxes(page);
     expect(bs).toHaveLength(ALL_ON_MAP);
     expect(overlaps(bs)).toEqual([]);
+    void consoleErrors;
+  });
+  test('マウスの画面では矢印でカルーセルを送れる', async ({ page, consoleErrors }) => {
+    await page.goto('map/');
+    await mapReady(page);
+    const prev = page.getByRole('button', { name: '前の例文' });
+    const next = page.getByRole('button', { name: '次の例文' });
+    await expect(prev).toBeDisabled();
+    await expect(next).toBeEnabled();
+    // なめらかなスクロールが終わるのを待ちながら、端まで送る
+    for (let k = 0; k < 10; k++) {
+      await page.waitForTimeout(900);
+      if (await next.isDisabled()) break;
+      await next.click({ timeout: 3000 }).catch(() => undefined);
+    }
+    await expect(next).toBeDisabled();
+    await expect(prev).toBeEnabled();
+    expect(await inTrack(page, 9)).toBe(true);
+    await prev.click();
+    await expect(next).toBeEnabled();
     void consoleErrors;
   });
 });
