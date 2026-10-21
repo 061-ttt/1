@@ -53,7 +53,7 @@ const v = (dict: string, past: string, neg: string, te: string, ren: string, pol
 const VERBS: Record<string, Verb> = {
   // 不規則（JLect: いちゅん・ちゅーん・すん）
   行く: v('いちゅん', 'んじゃん', 'いかん', 'んじ', 'いち', 'いちゃ', { prog: 'んじょーん', q: 'いちゅみ', qPast: 'んじー' }),
-  来る: v('ちゅーん', 'ちゃん', 'くーん', 'っち', 'ちー', 'ちゃー', { prog: 'ちょーん', q: 'ちゅーみ', qPast: 'ちー' }),
+  来る: v('ちゅーん', 'ちゃん', 'くーん', 'っち', 'ちー', 'ちゃー', { prog: 'ちょーん', q: 'ちゅーみ', qPast: 'っちー' }),
   する: v('すん', 'さん', 'さん', 'っし', 'しー', 'さ', { prog: 'そーん' }),
   // m 語幹（JLect: ぬむん → ぬだん・ぬまん・ぬでぃ・ぬみ・ぬまびーん・ぬむみ・ぬでぃー）
   飲む: v('ぬむん', 'ぬだん', 'ぬまん', 'ぬでぃ', 'ぬみ', 'ぬま', { prog: 'ぬどーん', q: 'ぬむみ', qPast: 'ぬでぃー' }),
@@ -76,11 +76,11 @@ const VERBS: Record<string, Verb> = {
   いる: v('をぅん', 'をぅたん', 'をぅらん', 'をぅてぃ', 'をぅい', 'をぅい'),
   // s 語幹・t 語幹
   話す: v('はなすん', 'はなちゃん', 'はなさん', 'はなち', 'はなし', 'はなさ', { prog: 'はなちょーん' }),
-  待つ: v('まちゅん', 'まっちゃん', 'またん', 'まっち', 'まち', 'まちゃ', { prog: 'まっちょーん' }),
+  待つ: v('まちゅん', 'まっちゃん', 'またん', 'まっち', 'まち', 'また', { prog: 'まっちょーん' }), // JLect: matabiin
   // その他
   見る: v('んーじゅん', 'んーちゃん', 'んーだん', 'んーち', 'んーじ', 'んーじゃ', { prog: 'んーちょーん' }),
   寝る: v('にんじゅん', 'にんたん', 'にんだん', 'にんてぃ', 'にんじ', 'にんじゃ', { prog: 'にんとーん' }),
-  起きる: v('うきゆん', 'うきたん', 'うきらん', 'うきてぃ', 'うき', 'うきや', { prog: 'うきとーん' }),
+  起きる: v('うきゆん', 'うきたん', 'うきらん', 'うきてぃ', 'うきー', 'うきや', { prog: 'うきとーん' }),
   買う: v('こーいん', 'こーたん', 'こーらん', 'こーてぃ', 'こーい', 'こーや', { prog: 'こーとーん' }),
   会う: v('いちゃゆん', 'いちゃたん', 'いちゃらん', 'いちゃてぃ', 'いちゃい', 'いちゃや', { prog: 'いちゃとーん' }),
 };
@@ -91,7 +91,7 @@ const ADJS: Record<string, [string, string | null]> = {
   熱い: ['あち', 'あち'],
   寒い: ['ひー', 'ひー'],
   高い: ['たか', 'たか'],
-  安い: ['やっ', 'やし'],
+  安い: ['やっ', null],
   おいしい: ['まー', null],
   美味しい: ['まー', null],
   うまい: ['まー', null],
@@ -99,8 +99,8 @@ const ADJS: Record<string, [string, string | null]> = {
   きれい: ['ちゅら', 'ちゅら'],
   綺麗: ['ちゅら', 'ちゅら'],
   大きい: ['まぎ', 'まぎ'],
-  小さい: ['ぐな', 'ぐな'],
-  多い: ['うふ', null],
+  小さい: ['ぐま', 'ぐま'], // JLect: gumasan
+  多い: ['うふ', 'うふ'],
   いい: ['ゆた', null],
   良い: ['ゆた', null],
   よい: ['ゆた', null],
@@ -114,25 +114,28 @@ const ADJS: Record<string, [string, string | null]> = {
 };
 
 /** 名詞。h は人（主語に「が」を使う。人以外は「ぬ」） */
-interface Noun { w: string; h?: true; place?: true; time?: true }
+/** h: 主語に「が」（代名詞・親族名称。ほかの名詞は「ぬ」）、ga: 主語の形、gen: 連体の「の」 */
+interface Noun { w: string; h?: true; place?: true; time?: true; ga?: string; gen?: string }
 const n = (w: string, o: Omit<Noun, 'w'> = {}): Noun => ({ w, ...o });
 const H = { h: true } as const;
 const P = { place: true } as const;
 const T = { time: true } as const;
 
 const NOUNS: Record<string, Noun> = {
-  私: n('わん', H), わたし: n('わん', H), 僕: n('わん', H), ぼく: n('わん', H), 俺: n('わん', H),
+  // 「私が」は わーが（Wikipedia 英語版・琉球新報）
+  私: n('わん', { h: true, ga: 'わーが' }), わたし: n('わん', { h: true, ga: 'わーが' }), 僕: n('わん', { h: true, ga: 'わーが' }), ぼく: n('わん', { h: true, ga: 'わーが' }), 俺: n('わん', { h: true, ga: 'わーが' }),
   あなた: n('うんじゅ', H), 君: n('やー', H), きみ: n('やー', H), お前: n('やー', H),
   誰: n('たー', H),
-  これ: n('くり'), それ: n('うり'), あれ: n('あり'),
-  ここ: n('くま', P), そこ: n('んま', P), あそこ: n('あま', P),
+  // 指示代名詞の連体は「が」（ありが〜。琉球新報）
+  これ: n('くり', { gen: 'が' }), それ: n('うり', { gen: 'が' }), あれ: n('あり', { gen: 'が' }),
+  ここ: n('くま', P), そこ: n('うま', P), あそこ: n('あま', P),
   何: n('ぬー'), なに: n('ぬー'), どこ: n('まー', P),
   今日: n('ちゅー', T), 明日: n('あちゃー', T), 昨日: n('ちぬー', T), 今: n('なま', T), 朝: n('あさ', T), 夜: n('ゆる', T),
   時間: n('じかん'),
   雨: n('あみ'), 水: n('みじ'), 海: n('うみ', P), 空: n('てぃん'), 太陽: n('てぃーだ'), 花: n('はな'),
-  家: n('やー', P), うち: n('やー', P), 名前: n('なー'), 家族: n('やーにんじゅ', H),
-  子ども: n('わらび', H), 子供: n('わらび', H), 友達: n('どぅし', H), 友だち: n('どぅし', H),
-  先生: n('しんしー', H), 人: n('ちゅ', H), 男: n('いきが', H), 女: n('いなぐ', H),
+  家: n('やー', P), うち: n('やー', P), 名前: n('なー'), 家族: n('やーにんじゅ'),
+  子ども: n('わらび'), 子供: n('わらび'), 友達: n('どぅし'), 友だち: n('どぅし'),
+  先生: n('しんしー'), 人: n('っちゅ'), 男: n('いきが'), 女: n('いなぐ'),
   母: n('あんまー', H), お母さん: n('あんまー', H),
   学校: n('がっこー', P), 沖縄: n('うちなー', P), 東京: n('とーちょー', P),
   猫: n('まやー'), 犬: n('いん'), 鳥: n('とぅい'), 魚: n('いゆ'),
@@ -196,7 +199,7 @@ function topic(w: string): string {
     if (last === 'ゃ') return w + 'ー';
     if (last === 'ゅ') return head + 'ょー'; // ちゅ→ちょー
     if (last === 'ぅ') return head + 'ー'; // とぅ→とー、どぅ→どー
-    if (last === 'ぃ') return head.slice(0, -1) + ({ て: 'て', で: 'で' } as Record<string, string>)[head.slice(-1)] + 'ー'; // てぃ→てー
+    if (last === 'ぃ' && /[てで]$/.test(head)) return head + 'ー'; // てぃ→てー
     return w + 'や';
   }
   // ち・し・じ は「ちぇー・しぇー・じぇー」（クチ＋ヤ→クチェー）
@@ -385,10 +388,10 @@ function convertOkinawaLine(T: Tok[]): RyukyuResult {
         case 'は':
           return { words: [topic(w)], next: k + 1 };
         case 'が':
-          if (pT.p1 === '格助詞') return { words: [w + (noun.h ? 'が' : 'ぬ')], next: k + 1 };
+          if (pT.p1 === '格助詞') return { words: [noun.ga ?? w + (noun.h ? 'が' : 'ぬ')], next: k + 1 };
           break;
         case 'の':
-          if (pT.p1 === '連体化') return { words: [w + 'ぬ'], next: k + 1 };
+          if (pT.p1 === '連体化') return { words: [w + (noun.gen ?? 'ぬ')], next: k + 1 };
           break;
         case 'を':
           return { words: [w], next: k + 1 };
@@ -444,12 +447,12 @@ function convertOkinawaLine(T: Tok[]): RyukyuResult {
     const wh = WH.has(w);
     const p = s(k), p2 = s(k + 1);
     if (isEnd(k)) {
-      // 「何？」のような体言止めの疑問
-      if (question(k)) return { w: w + (hasWh ? ' やが' : ' やみ'), next: k };
+      // 「何？」のような体言止めの疑問は 名詞＋が（JLect: ふろー まーが？）
+      if (question(k)) return hasWh ? { w: w + 'が', next: k } : { missing: 'か' };
       return { w, next: k };
     }
     if (p === 'だ' && T[k].cform === '基本形') {
-      if (s(k + 1) === 'よ') return { w: w + 'どー', next: k + 2 };
+      if (s(k + 1) === 'よ') return { w: w + ' やんどー', next: k + 2 };
       if (s(k + 1) === 'ね') return { missing: 'だね' };
       return { w: w + ' やん', next: k + 1 };
     }
@@ -459,10 +462,11 @@ function convertOkinawaLine(T: Tok[]): RyukyuResult {
       return { w: w + ' やいびーん', next: k + 1 };
     }
     if (p === 'だっ' && p2 === 'た') return { w: w + ' やたん', next: k + 2 };
-    if (p === 'でし' && p2 === 'た') return { w: w + ' やいびたん', next: k + 2 };
+    if (p === 'でし' && p2 === 'た') return { w: w + ' やいびーたん', next: k + 2 }; // JLect: yaibiitan
     if (p === 'だろ' && p2 === 'う') return { w: w + ' やるはじ', next: k + 2 };
-    if (p === 'よ' && T[k].p1.includes('終助詞')) return { w: w + 'どー', next: k + 1 };
-    if ((p === 'か' || p === 'の') && T[k].p1.includes('終助詞')) return { w: w + (hasWh || wh ? ' やが' : ' やみ'), next: k + 1 };
+    if (p === 'よ' && T[k].p1.includes('終助詞')) return { w: w + ' やんどー', next: k + 1 };
+    // 普通体の名詞の疑問は、疑問詞のある文だけ（名詞＋が）
+    if ((p === 'か' || p === 'の') && T[k].p1.includes('終助詞') && (hasWh || wh)) return { w: w + 'が', next: k + 1 };
     return { missing: p };
   }
 
@@ -505,22 +509,28 @@ function convertOkinawaLine(T: Tok[]): RyukyuResult {
       k++;
       if (T[k]?.pos === '名詞') form = attr(V.past);
       else if (question(k) && !hasWh) {
-        if (!V.qPast) return { missing: t.s + 'た？' };
+        if (!V.qPast) return { missing: t.s + s(i0 + 1) + '？' };
         form = V.qPast;
         k += askAt(k);
-      } else if (question(k)) return { missing: t.s + 'た？' };
+      } else if (question(k)) return { missing: t.s + s(i0 + 1) + '？' };
       else form = V.past;
     } else if (nx() === 'ない' && T[k].pos === '助動詞') {
       form = V.neg;
       k++;
       if (question(k)) {
         if (hasWh) return { missing: t.s + 'ない？' };
-        form = V.neg + 'い';
+        form = V.neg.replace(/ん$/, 'に'); // JLect: numani
         k += askAt(k);
       }
     } else if (nx() === 'なかっ' && s(k + 1) === 'た') {
       form = V.neg + 'たん';
       k += 2;
+      if (question(k)) {
+        // 否定過去の疑問は 〜んてぃー（JLect: numantii）。疑問詞のある文は未対応
+        if (hasWh) return { missing: t.s + 'なかった？' };
+        form = V.neg + 'てぃー';
+        k += askAt(k);
+      }
     } else if ((nx() === 'て' || nx() === 'で') && T[k].pos === '助詞') {
       k++;
       if (b(k) === 'いる' && T[k].pos === '動詞') {
@@ -533,7 +543,8 @@ function convertOkinawaLine(T: Tok[]): RyukyuResult {
         } else if (c.cform === '基本形') form = T[k]?.pos === '名詞' ? attr(V.prog) : V.prog;
         else return { missing: t.s + 'て' + c.s };
       } else if (b(k) === 'くださる' || s(k) === 'ください') {
-        form = V.te + 'くぃみそーれ';
+        // 「来てください」は尊敬の めんそーれ、ほかは 〜くぃみそーれ（JLect: nudi-kwimisooree）
+        form = t.base === '来る' ? 'めんそーれ' : V.te + 'くぃみそーれ';
         k++;
       } else if (s(k) === '、' || T[k]?.pos === '名詞' || T[k]?.pos === '副詞' || T[k]?.pos === '動詞') {
         form = V.te; // 〜して、〜
