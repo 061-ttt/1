@@ -206,8 +206,9 @@ const sampleBtns = SAMPLES.map((text, i) => {
 /** 端まで来たら矢印を無効にし、続きがある側だけ端をぼかす */
 function updateCarousel() {
   const max = track.scrollWidth - track.clientWidth;
-  const atStart = track.scrollLeft <= 2;
-  const atEnd = track.scrollLeft >= max - 2;
+  const pos = goal ?? track.scrollLeft;
+  const atStart = pos <= 2;
+  const atEnd = pos >= max - 2;
   carousel.classList.toggle('at-start', atStart);
   carousel.classList.toggle('at-end', atEnd);
   (carousel.querySelector('[data-dir="-1"]') as HTMLButtonElement).disabled = atStart;
@@ -215,10 +216,43 @@ function updateCarousel() {
 }
 track.addEventListener('scroll', updateCarousel, { passive: true });
 window.addEventListener('resize', updateCarousel);
+/**
+ * 矢印で 1 画面ぶん送る。スクロールスナップの止まる位置（例文の左端）へ正確に送るので、
+ * Safari でスナップに押し戻されて動かない、ということが起きない。
+ */
+/** 矢印で送っている途中の行き先（連打したときは、途中の位置ではなく行き先から次を決める） */
+let goal: number | null = null;
+let goalTimer = 0;
+function page(dir: 1 | -1) {
+  const pad = 24; // CSS の scroll-padding-inline と同じ
+  const max = track.scrollWidth - track.clientWidth;
+  // 例文 1 つずつ、スクロールスナップの止まる位置（例文の左端）へ送る。前へ・次へが対称になる
+  const stops = sampleBtns.map((x, i) => (i === 0 ? 0 : Math.min(max, Math.max(0, x.offsetLeft - pad))));
+  const pos = goal ?? track.scrollLeft;
+  let cur = 0;
+  stops.forEach((p, i) => {
+    if (Math.abs(p - pos) < Math.abs(stops[cur] - pos)) cur = i;
+  });
+  let next = cur + dir;
+  // 端に寄せた結果、同じ位置になる例文は飛ばす
+  while (next > 0 && next < stops.length - 1 && Math.abs(stops[next] - stops[cur]) < 1) next += dir;
+  next = Math.max(0, Math.min(stops.length - 1, next));
+  goal = stops[next];
+  clearTimeout(goalTimer);
+  goalTimer = window.setTimeout(() => (goal = null), 1500);
+  track.scrollTo({ left: goal, behavior: reduceMotion ? 'auto' : 'smooth' });
+  // 押した時点で端の判定を行き先に合わせる
+  updateCarousel();
+}
+track.addEventListener('scroll', () => {
+  if (goal !== null && Math.abs(track.scrollLeft - goal) < 2) goal = null;
+}, { passive: true });
+// 指で触ったら、矢印の行き先は忘れる
+track.addEventListener('pointerdown', () => (goal = null), { passive: true });
 carousel.addEventListener('click', (e) => {
   const btn = (e.target as HTMLElement).closest('.car-btn') as HTMLElement | null;
   if (!btn) return;
-  track.scrollBy({ left: Number(btn.dataset.dir) * track.clientWidth * 0.8, behavior: reduceMotion ? 'auto' : 'smooth' });
+  page(Number(btn.dataset.dir) as 1 | -1);
 });
 // ← → で例文を移る（ロービングタブインデックス）
 track.addEventListener('keydown', (e) => {

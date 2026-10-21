@@ -4,7 +4,12 @@
   position: fixed;
   inset: 0;
   overflow: hidden;
-  touch-action: none;
+  /*
+   * touch-action: none は地図のキャンバスだけに付ける。
+   * iPhone の Safari は祖先の touch-action を子の要素にも重ねて適用するため、
+   * ここに付けると例文のカルーセルが指で横に送れなくなる。
+   */
+  touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -17,7 +22,7 @@
   height: 100%;
   display: block;
 }
-#gl { cursor: grab; }
+#gl { cursor: grab; touch-action: none; }
 #gl:active { cursor: grabbing; }
 #ink { pointer-events: none; }
 
@@ -82,6 +87,7 @@
   gap: 4px;
 }
 .samples {
+  position: relative; /* 例文の offsetLeft をこの帯の中の位置にする */
   flex: 1;
   min-width: 0;
   height: 36px;
@@ -124,9 +130,9 @@
   color: #fff;
 }
 .sample:focus-visible { outline: 3px solid var(--ink); outline-offset: 1px; }
-/* 矢印はマウスで操作する画面だけ（指では横にスワイプ） */
+/* 矢印（指での横スワイプが分からない人や、スワイプできない環境のためにも常に出す） */
 .car-btn {
-  display: none;
+  display: grid;
   flex: none;
   width: 32px;
   height: 32px;
@@ -147,9 +153,6 @@
   stroke-linejoin: round;
 }
 .car-btn:disabled { opacity: 0.35; cursor: default; }
-@media (hover: hover) and (pointer: fine) {
-  .car-btn { display: grid; }
-}
 .status-line {
   margin: 0;
   max-width: 520px;
@@ -310,6 +313,8 @@
   width: min(360px, calc(100vw - 24px));
   transform-origin: 0 0;
   outline: none;
+  /* 横スワイプで前／次へ（縦は特徴の欄のスクロール） */
+  touch-action: pan-y;
 }
 #card[hidden] { display: none; }
 .card-body {

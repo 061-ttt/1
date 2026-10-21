@@ -277,14 +277,30 @@ async function inTrack(page: Page, i: number) {
   }, i);
 }
 
-test('例文は 10 個のカルーセル。指で横に送れて、最後の例文も選べる', async ({ page, consoleErrors }) => {
+test('例文は 10 個のカルーセル。指のスワイプでも矢印でも送れて、最後の例文も選べる', async ({ page, consoleErrors }) => {
   await page.goto('map/');
   await mapReady(page);
   const chips = page.locator('.sample');
   await expect(chips).toHaveCount(10);
   await expect(page.locator('.carousel')).toHaveClass(/at-start/);
-  // 矢印はタッチの画面では出さない
-  await expect(page.getByRole('button', { name: '次の例文' })).toBeHidden();
+  // iPhone の Safari は祖先の touch-action を重ねて適用する。帯とその祖先に none があると指で送れない
+  const blocked = await page.locator('.samples').evaluate((el) => {
+    const out: string[] = [];
+    for (let e: Element | null = el; e; e = e.parentElement) {
+      const ta = getComputedStyle(e).touchAction;
+      if (ta === 'none' || (ta !== 'auto' && !ta.includes('pan-x') && ta !== 'manipulation')) out.push(`${e.tagName}#${e.id}.${e.className}: ${ta}`);
+    }
+    return out;
+  });
+  expect(blocked).toEqual([]);
+  // 矢印はタッチの画面でも出す（タップで送れる）
+  const next = page.getByRole('button', { name: '次の例文' });
+  await expect(next).toBeVisible();
+  await expect(page.getByRole('button', { name: '前の例文' })).toBeDisabled();
+  await next.tap();
+  await expect(page.locator('.carousel')).not.toHaveClass(/at-start/, { timeout: 5000 });
+  await page.getByRole('button', { name: '前の例文' }).tap();
+  await expect(page.locator('.carousel')).toHaveClass(/at-start/, { timeout: 5000 });
   expect(await inTrack(page, 9)).toBe(false);
   // 横スワイプで送る
   const box = (await page.locator('.samples').boundingBox())!;
